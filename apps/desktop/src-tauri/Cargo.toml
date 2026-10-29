@@ -1,0 +1,33 @@
+[package]
+name = "qmusic-lite"
+version = "0.1.0"
+description = "QQ 音乐 · Lite"
+authors = ["qmusic-lite"]
+edition = "2021"
+rust-version = "1.77"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["time", "sync", "macros", "rt-multi-thread"] }
+reqwest = { version = "0.12", features = ["json", "gzip", "brotli"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+base64 = "0.22"
+uuid = { version = "1", features = ["v4"] }
+rand = "0.8"
+url = "2"
+httpdate = "1"
+regex = "1"
+keyring = { version = "3", default-features = false, features = ["windows-native"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true

@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>qmusic lite · 三个界面方向</title>
+<meta name="description" content="QQ 音乐 Lite 的三个界面方向：紫外线、流明、花期。同一份内容与数据，三套视觉系统，选一个作为最终 UI。">
+<style>
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: none (contact sheet over the project's own dark)
+ * nav: none · signature: the three directions side by side at the same size · states: linked, hovered · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H5 E4 S4 R4 V5 · weakest: S, a contact sheet belongs to no product; the three shots are kept at one size and one crop so the comparison is the only thing it argues */
+:root {
+  color-scheme: dark;
+  --color-paper: oklch(15% 0.015 285);
+  --color-paper-2: oklch(19% 0.018 285);
+  --color-paper-3: oklch(24% 0.02 285);
+  --color-ink: oklch(94% 0.01 285);
+  --color-ink-2: oklch(80% 0.02 285);
+  --color-muted: oklch(68% 0.025 285);
+  --color-rule: oklch(29% 0.02 285);
+  --color-focus: oklch(78% 0.12 300);
+  --font-display: "Segoe UI Variable Display", "PingFang SC", "Microsoft YaHei UI", ui-sans-serif, sans-serif;
+  --font-body: "Segoe UI Variable Text", "PingFang SC", "Microsoft YaHei UI", ui-sans-serif, sans-serif;
+  --space-3xs: 2px;
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 40px;
+  --space-2xl: 64px;
+  --radius-card: 14px;
+  --radius-pill: 999px;
+  --rule-hair: 1px;
+  --gutter: 40px;
+  --shadow-shot: 0 0 0 1px var(--color-rule), 0 24px 48px -32px oklch(4% 0.02 285 / 0.9);
+  --shadow-shot-hover: 0 0 0 1px var(--color-paper-3), 0 24px 48px -28px oklch(4% 0.02 285 / 0.95);
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { overflow-x: clip; scrollbar-color: var(--color-paper-3) var(--color-paper); }
+body {
+  margin: 0;
+  overflow-x: clip;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2 { margin: 0; font-family: var(--font-display); font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; text-wrap: balance; }
+p, ul { margin: 0; padding: 0; }
+ul { list-style: none; }
+a { color: inherit; text-decoration: none; }
+img { display: block; width: 100%; height: auto; }
+:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+::selection { background: color-mix(in oklab, var(--color-focus) 30%, transparent); }
+
+.page { max-width: 1440px; margin-inline: auto; padding: var(--space-2xl) var(--gutter) var(--space-xl); }
+.head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-md) var(--space-xl); padding-bottom: var(--space-xl); border-bottom: var(--rule-hair) solid var(--color-rule); }
+.head h1 { font-size: clamp(1.75rem, 3vw, 2.5rem); }
+.head p { max-width: 46ch; color: var(--color-muted); }
+
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-xl) var(--space-lg); padding-top: var(--space-xl); }
+.item { display: flex; flex-direction: column; gap: var(--space-md); min-width: 0; }
+.shot { display: block; border-radius: var(--radius-card); overflow: hidden; background: var(--color-paper-2); box-shadow: var(--shadow-shot); aspect-ratio: 16 / 10; transition: box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1); }
+.shot:hover { box-shadow: var(--shadow-shot-hover); }
+.shot:active { box-shadow: var(--shadow-shot); }
+.shot img { height: 100%; object-fit: cover; object-position: top left; }
+.no { display: flex; align-items: baseline; gap: var(--space-xs); color: var(--color-muted); font-size: 12px; }
+.no b { color: var(--color-ink); font-weight: 500; }
+.item h2 { font-size: 1.25rem; }
+.item .desc { color: var(--color-ink-2); font-size: 14px; line-height: 1.7; }
+.tags { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+.tags li { padding: var(--space-3xs) var(--space-xs); border-radius: var(--radius-pill); box-shadow: inset 0 0 0 1px var(--color-rule); color: var(--color-muted); font-size: 12px; white-space: nowrap; }
+.open {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  height: 36px;
+  margin-top: var(--space-2xs);
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px var(--color-rule);
+  font-size: 13px;
+  white-space: nowrap;
+  transition: background-color 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.open:hover { background: var(--color-paper-2); }
+.open:active { background: var(--color-paper-3); }
+.foot { margin-top: var(--space-2xl); padding-top: var(--space-lg); border-top: var(--rule-hair) solid var(--color-rule); color: var(--color-muted); font-size: 12px; line-height: 1.8; max-width: 76ch; }
+@media (max-width: 1100px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .grid { grid-template-columns: minmax(0, 1fr); } .page { padding-inline: var(--space-md); } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  .shot:hover img { transform: none; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="head">
+    <h1>三种界面方向</h1>
+    <p>同一份内容、同一套外壳，三种视觉系统。点开任意一个看全屏，再回来告诉我选哪个；选定后我再把它接进 React。</p>
+  </header>
+
+  <main class="grid">
+    <article class="item">
+      <a class="shot" href="./v1/index.html"><img src="./shots/v1.png" alt="方向一 紫外线 的发现页预览"></a>
+      <p class="no">方向 <b>01</b></p>
+      <h2>紫外线</h2>
+      <p class="desc">近黑的紫调底色，几何无衬线全部小写，发丝分栏，一枚饱和紫只出现在播放与进度上。像一台夜里开着的唱机。</p>
+      <ul class="tags"><li>暗色</li><li>几何无衬线</li><li>发丝分隔</li></ul>
+      <a class="open" href="./v1/index.html">打开全屏预览</a>
+    </article>
+
+    <article class="item">
+      <a class="shot" href="./v2/index.html"><img src="./shots/v2.png" alt="方向二 流明 的发现页预览"></a>
+      <p class="no">方向 <b>02</b></p>
+      <h2>流明</h2>
+      <p class="desc">紫黑夜色里的小写衬线标题，蓝图网格托住整张每日歌单，黄铜是唯一的信号色。最像一本夜间值班笔记。</p>
+      <ul class="tags"><li>暗色</li><li>衬线标题</li><li>黄铜信号</li></ul>
+      <a class="open" href="./v2/index.html">打开全屏预览</a>
+    </article>
+
+    <article class="item">
+      <a class="shot" href="./v3/index.html"><img src="./shots/v3.png" alt="方向三 花期 的发现页预览"></a>
+      <p class="no">方向 <b>03</b></p>
+      <h2>花期</h2>
+      <p class="desc">暖白纸面与淡钢琴卷帘网格，每日歌单是四条浮起的片段，播放条像合上的琴盖浮在底部。陶土色是唯一实心。</p>
+      <ul class="tags"><li>亮色</li><li>钢琴卷帘</li><li>浮起播放条</li></ul>
+      <a class="open" href="./v3/index.html">打开全屏预览</a>
+    </article>
+  </main>
+
+  <p class="foot">三个方向都使用应用当前接口取回的真实歌单与歌曲（2026 年 10 月 29 日），封面来自音乐平台的图片服务；侧栏保持真实的未登录状态，没有虚构的账号、歌单或数据。预览在 1440 宽下设计，1280 宽同样成立。</p>
+</div>
+</body>
+</html>

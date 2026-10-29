@@ -1,0 +1,325 @@
+/*
+ * 动效层：只放"进入 / 离开 / 编排"，不放组件静态样式。
+ * 令牌见 tokens.css 顶部；入场与退场集中在这里，悬停/按压反馈留在各自的组件样式表中。
+ *
+ * 触发条件（不做隐式魔法）：
+ *   1. 路由入场 —— .page 以 pathname 为 key 重新挂载，仅在切换页面时播放一次；
+ *   2. 内容入场 —— 卡片/表格在数据首次落地、DOM 挂载时播放一次，不随查询刷新重放；
+ *   3. 浮层       —— open=true 进入，open=false 时由 usePresence 保留 DOM 播放退场；
+ *   4. 提示       —— toast 入场；dismiss 时先标记 leaving 再移除。
+ *
+ * 编排顺序：容器先、内容后；同级按阅读顺序级联，最多 5 级（≈128ms），
+ * 超出部分共用最后一级延迟，避免"越往下等越久"。
+ */
+
+/* ------------------------------- 关键帧 ------------------------------- */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, var(--rise, 10px), 0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -6px, 0) scale(0.985);
+  }
+}
+
+@keyframes pop-out {
+  to {
+    opacity: 0;
+    transform: translate3d(0, -4px, 0) scale(0.99);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translate3d(18px, 0, 0);
+  }
+}
+
+@keyframes slide-out-right {
+  to {
+    opacity: 0;
+    transform: translate3d(12px, 0, 0);
+  }
+}
+
+@keyframes np-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+  }
+}
+
+@keyframes np-out {
+  to {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+}
+
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translate3d(0, -4px, 0);
+  }
+}
+
+/* ---------------------------- P3 路由入场 ---------------------------- */
+/*
+ * 页面根节点几乎都是单一 <div>，所以级联作用在它的一级子块上：
+ * hero / 页头 / section / 表格，正好是阅读顺序上的层次。
+ */
+.page > :first-child > * {
+  animation: rise-in var(--dur-page) var(--ease-out) backwards;
+}
+
+.page > :first-child > :nth-child(2) {
+  animation-delay: var(--stagger);
+}
+
+.page > :first-child > :nth-child(3) {
+  animation-delay: calc(var(--stagger) * 2);
+}
+
+.page > :first-child > :nth-child(4) {
+  animation-delay: calc(var(--stagger) * 3);
+}
+
+.page > :first-child > :nth-child(n + 5) {
+  animation-delay: calc(var(--stagger) * 4);
+}
+
+/* P3 内容入场：卡片按顺序浮起，最多 6 张（≈120ms） */
+.cards > .card {
+  animation: rise-in var(--dur-card) var(--ease-out) backwards;
+}
+
+.cards > .card:nth-child(2) {
+  animation-delay: var(--stagger-card);
+}
+
+.cards > .card:nth-child(3) {
+  animation-delay: calc(var(--stagger-card) * 2);
+}
+
+.cards > .card:nth-child(4) {
+  animation-delay: calc(var(--stagger-card) * 3);
+}
+
+.cards > .card:nth-child(5) {
+  animation-delay: calc(var(--stagger-card) * 4);
+}
+
+.cards > .card:nth-child(n + 6) {
+  animation-delay: calc(var(--stagger-card) * 5);
+}
+
+/* 表格整体淡入，行不逐条级联：长列表逐行动画只会显得慢 */
+.track-table {
+  animation: fade-in var(--dur-base) var(--ease-out) backwards;
+}
+
+/* 搜索建议：从输入框下缘展开，方向与来源一致 */
+.suggest-panel {
+  transform-origin: top center;
+  animation: pop-in var(--dur-fast) var(--ease-out) backwards;
+}
+
+/* 登录卡片：无外壳页面也有完整的第一印象 */
+.login-card {
+  animation: rise-in var(--dur-page) var(--ease-out) backwards;
+}
+
+.login-page .chrome-corner {
+  animation: fade-in var(--dur-base) var(--ease-out) backwards;
+}
+
+/* 启动页：先立住品牌，再出现进度点 */
+.boot-mark {
+  animation: rise-in var(--dur-page) var(--ease-out) backwards;
+}
+
+.boot-title {
+  animation: fade-in var(--dur-base) var(--ease-out) backwards;
+  animation-delay: var(--stagger);
+}
+
+.boot-loading,
+.boot-error {
+  animation: fade-in var(--dur-base) var(--ease-out) backwards;
+  animation-delay: calc(var(--stagger) * 2);
+}
+
+/* ---------------------------- P2 浮层进出 ---------------------------- */
+.nowplaying {
+  animation: np-in var(--dur-overlay) var(--ease-out) backwards;
+}
+
+.nowplaying.is-closing {
+  pointer-events: none;
+  animation: np-out var(--dur-exit) var(--ease-in) forwards;
+}
+
+.drawer-backdrop {
+  animation: fade-in var(--dur-base) var(--ease-out) backwards;
+}
+
+.drawer-backdrop.is-closing {
+  pointer-events: none;
+  animation: fade-out var(--dur-exit) var(--ease-in) forwards;
+}
+
+.queue-panel {
+  animation: slide-in-right var(--dur-overlay) var(--ease-out) backwards;
+}
+
+.queue-panel.is-closing {
+  pointer-events: none;
+  animation: slide-out-right var(--dur-exit) var(--ease-in) forwards;
+}
+
+.palette-backdrop {
+  animation: fade-in var(--dur-base) var(--ease-out) backwards;
+}
+
+.palette-backdrop.is-closing {
+  pointer-events: none;
+  animation: fade-out var(--dur-exit) var(--ease-in) forwards;
+}
+
+.palette {
+  transform-origin: top center;
+  animation: pop-in var(--dur-overlay) var(--ease-out) backwards;
+}
+
+.palette-backdrop.is-closing .palette {
+  animation: pop-out var(--dur-exit) var(--ease-in) forwards;
+}
+
+/* ------------------------------ P1 提示 ------------------------------ */
+.toast {
+  animation: toast-in var(--dur-base) var(--ease-out) backwards;
+}
+
+.toast.leaving {
+  pointer-events: none;
+  animation: toast-out var(--dur-exit) var(--ease-in) forwards;
+}
+
+/* --------------------------- 适配与降级 --------------------------- */
+/* 触屏没有悬停态，别让 hover 效果粘在手指上 */
+@media (hover: none) {
+  .card:hover .art {
+    box-shadow: var(--shadow-card);
+    transform: none;
+  }
+
+  .track:hover::after {
+    opacity: 0;
+  }
+}
+
+/* 窄屏：级联步长收一半，总时长不被拉长 */
+@media (max-width: 980px) {
+  :root {
+    --stagger: 20ms;
+    --stagger-card: 16ms;
+    --dur-page: 260ms;
+    --dur-card: 220ms;
+  }
+}
+
+/*
+ * 降低动态效果：位移与缩放全部取消，只保留极短的透明度切换。
+ * 关键帧仍会执行，但时长被 base.css 的全局规则压到 1ms，视觉上等同直接切换。
+ */
+@media (prefers-reduced-motion: reduce) {
+  .page > :first-child > *,
+  .cards > .card,
+  .track-table,
+  .suggest-panel,
+  .login-card,
+  .boot-mark,
+  .boot-title,
+  .boot-loading,
+  .boot-error,
+  .nowplaying,
+  .queue-panel,
+  .palette,
+  .palette-backdrop,
+  .drawer-backdrop,
+  .toast {
+    animation-delay: 0ms !important;
+  }
+
+  .card:hover .art {
+    transform: none;
+  }
+}
+
+/* --------------------------- 合成能力降档 --------------------------- */
+/*
+ * 档位由 shared/lib/motion-mode.ts 写在 <html data-motion>：
+ *   lite   —— 软件渲染 / 低端集显 / 系统要求减少动态效果
+ *   legacy —— 仅供 A/B 对比改造收益，行为等同 lite
+ * 两档都退回改造前的属性路径：位置用 width / left，代价是逐帧布局与重绘，
+ * 但保证在完全没有合成能力的环境里也不会掉帧。
+ */
+[data-motion='lite'] .bar .fill,
+[data-motion='legacy'] .bar .fill,
+[data-motion='lite'] .volume .vbar i,
+[data-motion='legacy'] .volume .vbar i {
+  transform: none;
+  width: calc(var(--p, 0) * 100%);
+}
+
+[data-motion='lite'] .bar .knob,
+[data-motion='legacy'] .bar .knob {
+  transform: translate(-50%, -50%);
+  left: calc(var(--p, 0) * 100%);
+}
+
+[data-motion='lite'] .volume .vknob,
+[data-motion='legacy'] .volume .vknob {
+  transform: translate(-50%, -50%);
+  left: calc(var(--p, 0) * 100%);
+}
+
+/* 降档环境里循环动画与级联延迟都停掉：它们只贡献观感，不贡献信息 */
+[data-motion='lite'] .eq i,
+[data-motion='lite'] .skeleton::after {
+  animation: none;
+}
+
+[data-motion='lite'] .page > :first-child > *,
+[data-motion='lite'] .cards > .card {
+  animation-delay: 0ms !important;
+}
+
+[data-motion='lite'] .np-lyric-track {
+  transition: none;
+}

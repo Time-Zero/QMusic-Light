@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>qmusic lite · 方向三 花期</title>
+<meta name="description" content="QQ 音乐 Lite 的界面方向三：花期，暖白纸面与淡钢琴卷帘网格、陶土色圆点主按钮、浮起的播放卡片。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://api.fontshare.com/v2/css?f[]=ranade@400,500,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
+  <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m15 9-2 5-5 2 2-5Z"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="15" rx="3"/><path d="M8 3.5v4M16 3.5v4M3.5 10.5h17"/></symbol>
+  <symbol id="i-library" viewBox="0 0 24 24"><path d="M4 5.5h4v13H4zM10.5 5.5h4v13h-4z"/><path d="m17 6.6 3.2-.9 2.6 12.2-3.2.7Z"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-9.6A4.4 4.4 0 0 1 12 7.4a4.4 4.4 0 0 1 7.5 3c0 5-7.5 9.6-7.5 9.6Z"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4.5V9H8"/><path d="M12 8v4.4l3 1.8"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24"><path d="M18.5 6v12L9 12Z"/><path d="M5.5 6v12"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="M5.5 6v12L15 12Z"/><path d="M18.5 6v12"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8.5 5.5v13L19 12Z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 5.5v13M15 5.5v13"/></symbol>
+  <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M17 3.5 20.5 7 17 10.5"/><path d="M17 13.5 20.5 17 17 20.5"/><path d="M3.5 7h4l9.5 10h3.5"/><path d="M3.5 17h4l3-3.2"/></symbol>
+  <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M6.5 7.5h11a3 3 0 0 1 3 3v1"/><path d="m14.5 4.5 3 3-3 3"/><path d="M17.5 16.5h-11a3 3 0 0 1-3-3v-1"/><path d="m9.5 19.5-3-3 3-3"/></symbol>
+  <symbol id="i-volume" viewBox="0 0 24 24"><path d="M4 9.5h3l4.5-3.8v12.6L7 14.5H4Z"/><path d="M15 9a4.5 4.5 0 0 1 0 6"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M4 7h9M4 12h9M4 17h6"/><path d="M16.5 6.5v9.2a2.4 2.4 0 1 1-1.6-2.3"/></symbol>
+  <symbol id="i-lyrics" viewBox="0 0 24 24"><path d="M4.5 5.5h9M4.5 10h15M4.5 14.5h12M4.5 19h7"/></symbol>
+  <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M9.5 4.5v15"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24"><path d="M3.5 12h3l2-5 3 10 3-12 2.5 7h3"/></symbol>
+  <symbol id="i-login" viewBox="0 0 24 24"><path d="M14 4.5h4a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-4"/><path d="M10 8.5 14 12l-4 3.5"/><path d="M3.5 12H14"/></symbol>
+  <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="M14.5 5.5 8 12l6.5 6.5"/></symbol>
+  <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="M9.5 5.5 16 12l-6.5 6.5"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13.5 6.5 20 12l-6.5 5.5"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/></symbol>
+</svg>
+
+<div class="app">
+  <aside class="side">
+    <a class="brand" href="#">
+      <span class="wordmark">qmusic</span>
+      <span class="brand-tag">lite</span>
+    </a>
+
+    <button class="search" type="button">
+      <svg class="ico" aria-hidden="true"><use href="#i-search"/></svg>
+      <span>搜索歌曲、歌单</span>
+      <kbd>ctrl k</kbd>
+    </button>
+
+    <nav class="nav" aria-label="主导航">
+      <a class="nav-item is-on" href="#"><svg class="ico" aria-hidden="true"><use href="#i-compass"/></svg><span>发现</span></a>
+      <a class="nav-item" href="#"><svg class="ico" aria-hidden="true"><use href="#i-calendar"/></svg><span>每日 30 首</span><span class="nav-count">30</span></a>
+      <a class="nav-item" href="#"><svg class="ico" aria-hidden="true"><use href="#i-library"/></svg><span>我的音乐</span></a>
+      <a class="nav-item" href="#"><svg class="ico" aria-hidden="true"><use href="#i-heart"/></svg><span>我喜欢的音乐</span></a>
+      <a class="nav-item" href="#"><svg class="ico" aria-hidden="true"><use href="#i-history"/></svg><span>最近播放</span></a>
+    </nav>
+
+    <div class="side-group">
+      <p class="side-label">我的歌单</p>
+      <p class="side-empty">登录后同步你的歌单</p>
+    </div>
+    <div class="side-group">
+      <p class="side-label">收藏的歌单</p>
+      <p class="side-empty">登录后显示</p>
+    </div>
+
+    <div class="account">
+      <span class="avatar">?</span>
+      <span class="who">
+        <span class="who-name">未登录</span>
+        <span class="who-sub">先逛，再登录</span>
+      </span>
+      <button class="icon-btn" type="button" aria-label="扫码登录"><svg class="ico" aria-hidden="true"><use href="#i-login"/></svg></button>
+    </div>
+  </aside>
+
+  <div class="workspace">
+    <header class="topbar">
+      <div class="history">
+        <button class="icon-btn" type="button" aria-label="后退"><svg class="ico" aria-hidden="true"><use href="#i-chev-l"/></svg></button>
+        <button class="icon-btn" type="button" aria-label="前进"><svg class="ico" aria-hidden="true"><use href="#i-chev-r"/></svg></button>
+      </div>
+      <p class="crumb">发现</p>
+      <div class="top-actions">
+        <button class="icon-btn" type="button" aria-label="折叠侧栏"><svg class="ico" aria-hidden="true"><use href="#i-panel"/></svg></button>
+        <button class="pill" type="button"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>新建歌单</button>
+        <button class="pill" type="button"><svg class="ico" aria-hidden="true"><use href="#i-wave"/></svg>音质 标准</button>
+        <button class="pill" type="button"><svg class="ico" aria-hidden="true"><use href="#i-login"/></svg>扫码登录</button>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="content-inner">
+
+        <section class="hero">
+          <div class="hero-copy">
+            <h1>每日 30 首</h1>
+            <p class="hero-note">按最近的播放挑的三十首，每天零点换上新的。</p>
+            <div class="hero-actions">
+              <button class="btn btn-primary" type="button"><span class="rubber" aria-hidden="true"><svg class="ico" aria-hidden="true"><use href="#i-play"/></svg></span>播放全部</button>
+              <button class="btn btn-quiet" type="button">打开歌单</button>
+            </div>
+          </div>
+
+          <ol class="clips">
+            <li class="clip is-current">
+              <span class="clip-tone" aria-hidden="true"></span>
+              <span class="clip-name">阴天</span>
+              <span class="clip-who">莫文蔚</span>
+              <span class="clip-time">4:02</span>
+            </li>
+            <li class="clip">
+              <span class="clip-tone" aria-hidden="true"></span>
+              <span class="clip-name">何必</span>
+              <span class="clip-who">少年霜</span>
+              <span class="clip-time">3:04</span>
+            </li>
+            <li class="clip">
+              <span class="clip-tone" aria-hidden="true"></span>
+              <span class="clip-name">过了</span>
+              <span class="clip-who">郁可唯</span>
+              <span class="clip-time">4:48</span>
+            </li>
+            <li class="clip">
+              <span class="clip-tone" aria-hidden="true"></span>
+              <span class="clip-name">星月落</span>
+              <span class="clip-who">浮生梦</span>
+              <span class="clip-time">3:18</span>
+            </li>
+          </ol>
+        </section>
+
+        <section class="sec">
+          <div class="sec-head">
+            <h2>今日精选</h2>
+            <button class="pill" type="button">换一批</button>
+          </div>
+          <ul class="cards">
+            <li>
+              <a class="card" href="#">
+                <span class="card-art"><img src="https://music-file.y.qq.com/songlist/u/oK6kowEAoK4z7eSk7w-s7eoANn/1be4e/73cf5a10b2d40f25ba41410a28f93c821931e68c_d4c1b.jpg?imageView2/4/w/600/h/600" alt="" width="600" height="600"></span>
+                <span class="card-title">注意单循预警！爆款热歌一听到底</span>
+                <span class="card-meta"><span>贝多芬的猫</span><span class="num">327 首</span></span>
+              </a>
+            </li>
+            <li>
+              <a class="card" href="#">
+                <span class="card-art"><img src="https://music-file.y.qq.com/songlist/u/oKSqoKSP7i6Aon/21f9f/26793481448d4c1a019ac7abed740866f16967b0_8cbfd.jpg?imageView2/4/w/600/h/600" alt="" width="600" height="600"></span>
+                <span class="card-title">1000首抖音热歌：近年来火爆全网</span>
+                <span class="card-meta"><span>张大佛爷</span><span class="num">1044 首</span></span>
+              </a>
+            </li>
+            <li>
+              <a class="card" href="#">
+                <span class="card-art"><img src="https://qpic.y.qq.com/music_cover/6zW492Pic3UYb3icTfZXgxQ9uEOUH8ibfGcxGicfF7SPKU7LDiaZxgGHdTA/600?n=1" alt="" width="600" height="600"></span>
+                <span class="card-title">在耳机另一端，才是情歌的加分项</span>
+                <span class="card-meta"><span>左耳先森</span><span class="num">130 首</span></span>
+              </a>
+            </li>
+            <li>
+              <a class="card" href="#">
+                <span class="card-art"><img src="https://music-file.y.qq.com/songlist/u/oKcP7wvF7e-q7c/15364/bf48587389b81a6c2cbb5250599328ed377e3890_8f194.jpg?imageView2/4/w/600/h/600" alt="" width="600" height="600"></span>
+                <span class="card-title">跑步音乐：运动必备活力节奏</span>
+                <span class="card-meta"><span>燕尾蝶</span><span class="num">51 首</span></span>
+              </a>
+            </li>
+            <li>
+              <a class="card" href="#">
+                <span class="card-art"><img src="https://music-file.y.qq.com/songlist/u/oK6kowEAoK4z7eC57evq7Knson/15c71/db0312da8bc06ab65c2581d364c017822875cfb8_446b3.jpg?imageView2/4/w/600/h/600" alt="" width="600" height="600"></span>
+                <span class="card-title">初音ミク与重音テト的奇幻共鸣</span>
+                <span class="card-meta"><span>CinZr_Official</span><span class="num">59 首</span></span>
+              </a>
+            </li>
+            <li>
+              <a class="card" href="#">
+                <span class="card-art"><img src="https://qpic.y.qq.com/music_cover/pWY30OxPyoIrJicsjDicV295TGibvdGUibu5lben2oycnibDpFkvibeo9cbHicW6KY6xiczv/600?n=1" alt="" width="600" height="600"></span>
+                <span class="card-title">古风魅力绝词妙曲 赏国韵风华</span>
+                <span class="card-meta"><span>狂人张三</span><span class="num">402 首</span></span>
+              </a>
+            </li>
+          </ul>
+        </section>
+
+        <section class="sec">
+          <div class="sec-head">
+            <h2>最近播放</h2>
+            <a class="pill" href="#">全部<svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></a>
+          </div>
+          <ul class="rows">
+            <li class="row">
+              <button class="row-main" type="button">
+                <span class="row-art"><img src="https://y.gtimg.cn/music/photo_new/T002R300x300M000002d6m7k0xCbSv.jpg" alt="" width="300" height="300"></span>
+                <span class="row-meta"><span class="row-title">唯一</span><span class="row-who">G.E.M.邓紫棋</span></span>
+              </button>
+              <span class="row-album">T.I.M.E.</span>
+              <span class="row-time num">4:13</span>
+              <button class="icon-btn" type="button" aria-label="喜欢 唯一"><svg class="ico" aria-hidden="true"><use href="#i-heart"/></svg></button>
+            </li>
+            <li class="row">
+              <button class="row-main" type="button">
+                <span class="row-art"><img src="https://y.gtimg.cn/music/photo_new/T002R300x300M000003y8dsH2wBHlo.jpg" alt="" width="300" height="300"></span>
+                <span class="row-meta"><span class="row-title">演员</span><span class="row-who">薛之谦</span></span>
+              </button>
+              <span class="row-album">绅士</span>
+              <span class="row-time num">4:21</span>
+              <button class="icon-btn" type="button" aria-label="喜欢 演员"><svg class="ico" aria-hidden="true"><use href="#i-heart"/></svg></button>
+            </li>
+            <li class="row">
+              <button class="row-main" type="button">
+                <span class="row-art"><img src="https://y.gtimg.cn/music/photo_new/T002R300x300M000002AiRS049A472.jpg" alt="" width="300" height="300"></span>
+                <span class="row-meta"><span class="row-title">Sleepless 9</span><span class="row-who">姚弛</span></span>
+              </button>
+              <span class="row-album">Sleepless 9</span>
+              <span class="row-time num">3:19</span>
+              <button class="icon-btn" type="button" aria-label="喜欢 Sleepless 9"><svg class="ico" aria-hidden="true"><use href="#i-heart"/></svg></button>
+            </li>
+            <li class="row">
+              <button class="row-main" type="button">
+                <span class="row-art"><img src="https://y.gtimg.cn/music/photo_new/T002R300x300M000003NWBoo1vnwmj.jpg" alt="" width="300" height="300"></span>
+                <span class="row-meta"><span class="row-title">心跳同频</span><span class="row-who">Dx</span></span>
+              </button>
+              <span class="row-album">心跳同频</span>
+              <span class="row-time num">3:01</span>
+              <button class="icon-btn" type="button" aria-label="喜欢 心跳同频"><svg class="ico" aria-hidden="true"><use href="#i-heart"/></svg></button>
+            </li>
+          </ul>
+        </section>
+
+      </div>
+    </main>
+  </div>
+</div>
+
+<footer class="player">
+  <div class="now">
+    <span class="now-art"><img src="https://y.gtimg.cn/music/photo_new/T002R300x300M000000hTTJN3oScZr.jpg" alt="" width="300" height="300"></span>
+    <span class="now-meta">
+      <span class="now-title">阴天</span>
+      <span class="now-who">莫文蔚 / You Can</span>
+    </span>
+    <button class="icon-btn" type="button" aria-label="喜欢 阴天"><svg class="ico" aria-hidden="true"><use href="#i-heart"/></svg></button>
+  </div>
+
+  <div class="transport">
+    <div class="controls">
+      <button class="icon-btn" type="button" aria-label="随机播放"><svg class="ico" aria-hidden="true"><use href="#i-shuffle"/></svg></button>
+      <button class="icon-btn" type="button" aria-label="上一首"><svg class="ico" aria-hidden="true"><use href="#i-prev"/></svg></button>
+      <button class="play-btn" type="button" aria-label="暂停"><span class="rubber" aria-hidden="true"><svg class="ico" aria-hidden="true"><use href="#i-pause"/></svg></span></button>
+      <button class="icon-btn" type="button" aria-label="下一首"><svg class="ico" aria-hidden="true"><use href="#i-next"/></svg></button>
+      <button class="icon-btn" type="button" aria-label="顺序播放"><svg class="ico" aria-hidden="true"><use href="#i-repeat"/></svg></button>
+    </div>
+    <div class="progress">
+      <span class="time num">1:12</span>
+      <div class="bar" role="slider" aria-label="播放进度" aria-valuemin="0" aria-valuemax="242" aria-valuenow="72"><i style="width:29.7%"></i></div>
+      <span class="time num">4:02</span>
+    </div>
+  </div>
+
+  <div class="output">
+    <button class="icon-btn" type="button" aria-label="播放队列"><svg class="ico" aria-hidden="true"><use href="#i-list"/></svg></button>
+    <button class="icon-btn" type="button" aria-label="歌词"><svg class="ico" aria-hidden="true"><use href="#i-lyrics"/></svg></button>
+    <div class="volume">
+      <svg class="ico" aria-hidden="true"><use href="#i-volume"/></svg>
+      <div class="bar bar-sm" role="slider" aria-label="音量" aria-valuemin="0" aria-valuemax="100" aria-valuenow="70"><i style="width:70%"></i></div>
+    </div>
+    <button class="theme-btn" type="button"><svg class="ico" aria-hidden="true"><use href="#i-sun"/></svg>主题</button>
+  </div>
+</footer>
+
+</body>
+</html>

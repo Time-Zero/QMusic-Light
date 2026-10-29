@@ -1,0 +1,180 @@
+/*
+ * 花期（Bloom）：暖白纸面、钢琴卷帘网格、浮起的纸片、一枚陶土色实心控制。
+ * 白天是默认；夜里是同一套材料的暗色，而不是另一套设计。
+ * 旧变量名（--bg / --text / --accent …）保留，值全部换成花期的一套，组件无需逐个改名。
+ */
+:root {
+  color-scheme: light;
+
+  /* 纸 */
+  --paper: oklch(97% 0.01 72);
+  --paper-2: oklch(94.6% 0.013 70);
+  --paper-3: oklch(91.5% 0.016 66);
+  --sheet: oklch(98.7% 0.007 78);
+
+  /* 墨 */
+  --ink: oklch(21% 0.024 40);
+  --ink-2: oklch(31% 0.022 46);
+  --ink-3: oklch(45% 0.02 56);
+
+  /* 线 */
+  --rule: oklch(88% 0.014 64);
+  --rule-strong: oklch(80% 0.016 62);
+
+  /* 陶土 */
+  --clay: oklch(53% 0.145 36);
+  --clay-deep: oklch(45% 0.14 34);
+  --clay-soft: oklch(53% 0.145 36 / 0.11);
+  --clay-ink: oklch(98.5% 0.008 72);
+  --clay-hi: oklch(66% 0.125 42);
+  --clay-lo: oklch(43% 0.125 31);
+
+  /* 光与影 */
+  --shade-1: oklch(21% 0.024 40 / 0.08);
+  --shade-2: oklch(21% 0.024 40 / 0.16);
+  --shade-3: oklch(30% 0.06 40 / 0.28);
+  --hi: oklch(99.6% 0.006 80 / 0.75);
+  --bloom-1: oklch(53% 0.145 36 / 0.09);
+  --bloom-2: oklch(66% 0.1 55 / 0.07);
+  --grid-beat: oklch(21% 0.024 40 / 0.07);
+  --grid-bar: oklch(21% 0.024 40 / 0.12);
+  --grid-row: oklch(21% 0.024 40 / 0.04);
+  --mask-fade: linear-gradient(to bottom, var(--ink) 0%, oklch(21% 0.024 40 / 0) 92%);
+
+  /* 兼容旧名 */
+  --bg: var(--paper);
+  --bg-2: var(--paper);
+  --bg-elevated: var(--sheet);
+  --surface: color-mix(in oklab, var(--ink) 5%, transparent);
+  --surface-hover: color-mix(in oklab, var(--ink) 8%, transparent);
+  --surface-strong: color-mix(in oklab, var(--ink) 12%, transparent);
+  --border: var(--rule);
+  --border-strong: var(--rule-strong);
+  --text: var(--ink);
+  --text-secondary: var(--ink-2);
+  --text-tertiary: var(--ink-3);
+  --accent: var(--clay);
+  --accent-press: var(--clay-deep);
+  --accent-soft: var(--clay-soft);
+  --accent-text: var(--clay-deep);
+  --danger: oklch(50% 0.17 25);
+  --danger-soft: oklch(50% 0.17 25 / 0.1);
+
+  --shadow-lg: 0 2px 6px var(--shade-1), 0 40px 80px -44px var(--shade-3);
+  --shadow-md: 0 1px 2px var(--shade-1), 0 18px 36px -20px var(--shade-2);
+  --shadow-card: 0 1px 2px var(--shade-1), 0 16px 32px -18px var(--shade-2);
+  --shadow-lift: 0 2px 4px var(--shade-1), 0 34px 68px -30px var(--shade-3);
+
+  --sidebar-w: 228px;
+  --sidebar-w-min: 64px;
+  --player-h: 68px;
+  --player-gap: 12px;
+  --topbar-h: 52px;
+  --row-h: 52px;
+
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+
+  --font-sans:
+    'Ranade', 'Segoe UI Variable Text', 'Segoe UI', 'PingFang SC', 'HarmonyOS Sans SC',
+    'Microsoft YaHei UI', 'Microsoft YaHei', system-ui, sans-serif;
+  --font-display:
+    'Ranade', 'Segoe UI Variable Display', 'PingFang SC', 'HarmonyOS Sans SC',
+    'Microsoft YaHei UI', 'Microsoft YaHei', system-ui, sans-serif;
+
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 21px;
+  --fs-2xl: 30px;
+
+  /*
+   * 动效：一套节奏，四个档位。集中在此，组件只引用语义令牌，不写字面时长。
+   *
+   *  优先级  用途         令牌                        时长          缓动           触发条件
+   *  P0      输入反馈     --dur-press / --dur-fast    90 / 120ms    --ease-out     悬停、按压、焦点；立即响应，不排队
+   *  P1      状态切换     --dur-base                  200ms         --ease-out     选中态、播放态、加载完成
+   *  P2      浮层进出     --dur-overlay / --dur-exit  240 / 160ms   --ease-out/in  抽屉、命令面板、全屏播放页；退场快于入场
+   *  P3      页面与内容   --dur-page / --dur-card     320 / 260ms   --ease-out     路由切换、首批数据落地；级联 24–32ms
+   *  P4      环境动效     0.9–1.6s infinite           linear /      —              频谱、骨架微光、加载指示；窗口失焦即暂停
+   *  例外    布局折叠     --dur-base                  200ms         --ease-move    侧栏宽度（唯一的布局型过渡）
+   *
+   * 优先级即顺序：P0 永远不被 P1–P3 延迟；P3 只在挂载时播放一次，不随数据更新重放。
+   * 位移只用 transform，透明度只用 opacity；不使用 width/height/top/left 做过渡（侧栏折叠是唯一例外，见 layout.css）。
+   */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-move: cubic-bezier(0.33, 0.02, 0.18, 1);
+  --ease: var(--ease-out);
+
+  --dur-press: 90ms;
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-exit: 160ms;
+  --dur-overlay: 240ms;
+  --dur-card: 260ms;
+  --dur-page: 320ms;
+  --dur-slow: var(--dur-page); /* 旧名，等同页面入场 */
+
+  --stagger: 32ms;
+  --stagger-card: 24ms;
+  --rise: 10px;
+
+  --cover-a: oklch(80% 0.06 48);
+  --cover-b: oklch(64% 0.08 40);
+}
+
+/* 花期·夜：同一套材料，纸换成暖墨 */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --paper: oklch(20% 0.012 62);
+  --paper-2: oklch(24% 0.014 62);
+  --paper-3: oklch(28% 0.016 62);
+  --sheet: oklch(23.5% 0.013 64);
+
+  --ink: oklch(93% 0.012 74);
+  --ink-2: oklch(81% 0.014 72);
+  --ink-3: oklch(68% 0.016 70);
+
+  --rule: oklch(31% 0.014 62);
+  --rule-strong: oklch(40% 0.016 62);
+
+  --clay: oklch(63% 0.14 38);
+  --clay-deep: oklch(70% 0.13 40);
+  --clay-soft: oklch(63% 0.14 38 / 0.18);
+  --clay-ink: oklch(18% 0.02 40);
+  --clay-hi: oklch(72% 0.12 42);
+  --clay-lo: oklch(52% 0.13 34);
+
+  --shade-1: oklch(6% 0.01 60 / 0.5);
+  --shade-2: oklch(6% 0.01 60 / 0.45);
+  --shade-3: oklch(4% 0.01 60 / 0.6);
+  --hi: oklch(99% 0.006 80 / 0.1);
+  --bloom-1: oklch(63% 0.14 38 / 0.1);
+  --bloom-2: oklch(72% 0.1 55 / 0.06);
+  --grid-beat: oklch(93% 0.012 74 / 0.06);
+  --grid-bar: oklch(93% 0.012 74 / 0.1);
+  --grid-row: oklch(93% 0.012 74 / 0.035);
+  --mask-fade: linear-gradient(to bottom, var(--ink) 0%, oklch(93% 0.012 74 / 0) 92%);
+
+  --accent-text: oklch(72% 0.13 40);
+  --danger: oklch(68% 0.16 25);
+  --danger-soft: oklch(68% 0.16 25 / 0.14);
+
+  --cover-a: oklch(38% 0.06 48);
+  --cover-b: oklch(26% 0.06 40);
+}

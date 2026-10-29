@@ -1,0 +1,1097 @@
+/* ------------------------------ hero：一张钉在五线纸上的纸片 ------------------------------ */
+.hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-10);
+  margin-top: var(--sp-1);
+  padding: var(--sp-8) var(--sp-8) var(--sp-6);
+  border-radius: var(--radius-lg);
+  background: var(--sheet);
+  box-shadow: var(--shadow-card);
+}
+
+/* 钢琴卷帘：只在主卡片里出现一次，向下淡出 */
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(to right, var(--grid-bar) 1px, transparent 1px),
+    linear-gradient(to right, var(--grid-beat) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-row) 1px, transparent 1px);
+  background-size:
+    160px 100%,
+    40px 100%,
+    100% 22px;
+  mask-image: var(--mask-fade);
+  -webkit-mask-image: var(--mask-fade);
+  pointer-events: none;
+}
+
+.hero-cover {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: linear-gradient(150deg, var(--cover-a, var(--paper-3)), var(--cover-b, var(--paper-2)));
+  box-shadow: var(--shadow-md);
+}
+
+.hero-cover img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hero-cover .glyph {
+  position: relative;
+  z-index: 1;
+  font-size: 44px;
+  color: var(--clay-ink);
+  opacity: 0.85;
+}
+
+.hero-body {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.hero-aside {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-3);
+  margin-left: auto;
+  padding-right: 2px;
+  text-align: right;
+}
+
+.hero-aside .lab {
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  max-width: 320px;
+}
+
+.chips span {
+  padding: 3px var(--sp-2);
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--shade-1);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.streak {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+.streak b {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-kicker {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+.hero-kicker span:first-child {
+  color: var(--accent-text);
+  font-weight: 500;
+}
+
+.hero h1 {
+  margin: var(--sp-2) 0 6px;
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 500;
+  line-height: 1.06;
+  letter-spacing: -0.024em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.hero-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+.hero-meta i {
+  width: 1px;
+  height: 10px;
+  background: var(--rule-strong);
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-5);
+}
+
+.hero-desc {
+  display: -webkit-box;
+  max-width: 620px;
+  margin-top: var(--sp-2);
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  color: var(--text-tertiary);
+  font-size: var(--fs-xs);
+  line-height: 1.7;
+}
+
+/* 每日歌单：四条浮起的片段 */
+.hero-clips {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+  max-width: 520px;
+}
+
+.clip {
+  display: grid;
+  grid-template-columns: 3px minmax(0, 1fr) auto;
+  grid-template-areas:
+    'tone name time'
+    'tone who time';
+  align-items: center;
+  gap: 0 var(--sp-3);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow:
+    0 0 0 1px var(--shade-1),
+    0 8px 16px -14px var(--shade-2),
+    inset 0 1px 0 var(--hi);
+  color: inherit;
+  text-align: left;
+  transition:
+    box-shadow var(--dur-fast) var(--ease-out),
+    background var(--dur-base) var(--ease-move),
+    transform var(--dur-press) var(--ease-out);
+}
+
+.clip:hover {
+  box-shadow:
+    0 0 0 1px var(--shade-2),
+    0 10px 20px -14px var(--shade-2),
+    inset 0 1px 0 var(--hi);
+}
+
+.clip:active {
+  transform: scale(0.995);
+}
+
+.clip.is-current {
+  background: var(--clay-soft);
+  box-shadow:
+    0 0 0 1px var(--clay-soft),
+    inset 0 1px 0 var(--hi);
+}
+
+.clip-tone {
+  grid-area: tone;
+  align-self: stretch;
+  border-radius: 999px;
+  background: var(--rule-strong);
+}
+
+.clip.is-current .clip-tone {
+  background: var(--clay);
+}
+
+.clip-name {
+  grid-area: name;
+  overflow: hidden;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clip-who {
+  grid-area: who;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clip-time {
+  grid-area: time;
+  align-self: center;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1080px) {
+  .hero {
+    flex-wrap: wrap;
+    gap: var(--sp-6);
+  }
+
+  .hero-clips {
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  .hero h1 {
+    font-size: 34px;
+  }
+}
+
+/* ----------------------------- sections ----------------------------- */
+.section {
+  margin-top: var(--sp-8);
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+
+.section-head h2 {
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.section-head .sub {
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+.section-head .more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 4px 2px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--text-tertiary);
+  font-size: var(--fs-xs);
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+.section-head .more:hover {
+  color: var(--accent-text);
+}
+
+.section-head .more svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* ------------------------------ cards ------------------------------ */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--sp-6) var(--sp-4);
+  align-items: start;
+}
+
+.cards-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.cards-6 {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.card {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.card .art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: linear-gradient(150deg, var(--cover-a, var(--paper-3)), var(--cover-b, var(--paper-2)));
+  box-shadow: var(--shadow-card);
+  transition:
+    box-shadow var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+}
+
+.card .art img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 悬停只抬 2px：卡片是内容，不该抢走阅读注意力 */
+.card:hover .art {
+  box-shadow: var(--shadow-lift);
+  transform: translate3d(0, -2px, 0);
+}
+
+.card:active .art {
+  transform: translate3d(0, 0, 0) scale(0.995);
+  transition-duration: var(--dur-press);
+}
+
+.card .art .g {
+  position: relative;
+  z-index: 1;
+  font-size: 30px;
+  color: var(--clay-ink);
+  opacity: 0.75;
+}
+
+.card .art .rank {
+  position: absolute;
+  top: var(--sp-2);
+  left: var(--sp-2);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-xs);
+  background: var(--sheet);
+  box-shadow: 0 0 0 1px var(--shade-1);
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.card .art .play {
+  position: absolute;
+  right: var(--sp-2);
+  bottom: var(--sp-2);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--sheet) 76%, transparent);
+  box-shadow: 0 0 0 1px var(--shade-1);
+  color: var(--ink);
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    transform var(--dur-press) var(--ease-out);
+}
+
+.card:hover .play,
+.card:focus-visible .play {
+  background: var(--clay);
+  color: var(--clay-ink);
+}
+
+.card .play:active {
+  transform: scale(0.92);
+}
+
+.card .play svg {
+  width: 13px;
+  height: 13px;
+  margin-left: 1px;
+  fill: currentColor;
+}
+
+.card .name {
+  margin-top: var(--sp-2);
+  overflow: hidden;
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card .by {
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ----------------------------- tracks ----------------------------- */
+.track-table {
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+}
+
+.track-head,
+.track {
+  display: grid;
+  grid-template-columns: 42px minmax(180px, 1.6fr) minmax(110px, 1fr) minmax(100px, 0.9fr) 60px 34px;
+  align-items: center;
+  gap: 14px;
+  padding: 0 var(--sp-4);
+}
+
+.track-head {
+  height: 32px;
+  border-bottom: 1px solid var(--rule);
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.track-scroll {
+  overflow: auto;
+  max-height: var(--track-scroll-h, 460px);
+}
+
+.track {
+  position: relative;
+  /* 自成层叠上下文，让悬停底色的负层级伪元素只压在本行背景之上、文字之下 */
+  isolation: isolate;
+  height: var(--row-h);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+/*
+ * 悬停反馈（底色 + 描边）全部由伪元素的不透明度承担，而不是过渡 background / box-shadow：
+ * 列表在滚动容器里，任何背景或阴影动画都会让每帧重绘整行（文档 §7.7）。
+ * 伪元素只做 opacity 变化，走合成层；z-index:-1 保证它画在文字下面。
+ */
+.track::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--sheet);
+  box-shadow: inset 0 0 0 1px var(--shade-1);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.track:hover::after {
+  opacity: 1;
+}
+
+.track:active::after {
+  background: var(--paper-2);
+}
+
+.track .no {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.track .t {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.track .mini {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(145deg, var(--cover-a, var(--paper-3)), var(--cover-b, var(--paper-2)));
+  box-shadow: inset 0 0 0 1px var(--shade-1);
+}
+
+.track .mini img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.track .title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color var(--dur-base) var(--ease-out);
+}
+
+.track .title em {
+  flex: none;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--paper-2);
+  color: var(--text-tertiary);
+  font-size: 9.5px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.track .title em.vip {
+  color: var(--text-secondary);
+}
+
+.track .artist,
+.track .album {
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track .dur {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.track .act {
+  display: grid;
+  place-items: center;
+  height: 24px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--text-tertiary);
+  opacity: 0;
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.track:hover .act,
+.track .act.liked {
+  opacity: 1;
+}
+
+.track .act:hover {
+  color: var(--danger);
+  background: var(--surface);
+}
+
+.track .act.liked {
+  color: var(--danger);
+}
+
+.track .act svg {
+  width: 14px;
+  height: 14px;
+}
+
+.track.playing .no {
+  color: var(--accent-text);
+}
+
+.track.playing .title {
+  color: var(--accent-text);
+}
+
+.eq {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  height: 12px;
+  animation: fade-in var(--dur-base) var(--ease-out) backwards;
+}
+
+.eq i {
+  width: 2px;
+  border-radius: 1px;
+  background: var(--clay);
+  transform-origin: bottom;
+  animation: eq 1s ease-in-out infinite;
+}
+
+.eq i:nth-child(1) {
+  height: 5px;
+  animation-delay: -0.2s;
+}
+
+.eq i:nth-child(2) {
+  height: 11px;
+  animation-delay: -0.5s;
+}
+
+.eq i:nth-child(3) {
+  height: 7px;
+  animation-delay: -0.8s;
+}
+
+@keyframes eq {
+  0%,
+  100% {
+    transform: scaleY(0.45);
+  }
+
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+html[data-window-focus='blurred'] .eq i,
+html[data-window-focus='blurred'] .boot-loading span {
+  animation-play-state: paused;
+}
+
+.track-list-footer {
+  display: flex;
+  justify-content: center;
+  padding: var(--sp-5) 0 var(--sp-1);
+}
+
+/* ------------------------------ tabs ------------------------------ */
+.tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--paper-2);
+}
+
+.tab {
+  height: 28px;
+  padding: 0 var(--sp-4);
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-tertiary);
+  font-size: var(--fs-xs);
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab.active {
+  background: var(--sheet);
+  color: var(--text);
+  box-shadow: 0 1px 2px var(--shade-1);
+}
+
+/* ----------------------------- player：合上的琴盖 ----------------------------- */
+.player {
+  position: fixed;
+  left: var(--player-gap);
+  right: var(--player-gap);
+  bottom: var(--player-gap);
+  z-index: 30;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(340px, 1.5fr) minmax(220px, 1fr);
+  align-items: center;
+  gap: var(--sp-5);
+  height: var(--player-h);
+  padding: 0 var(--sp-4);
+  border-radius: var(--radius-lg);
+  background: var(--sheet);
+  box-shadow:
+    var(--shadow-lift),
+    inset 0 1px 0 var(--hi);
+}
+
+.now {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.now .cover {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: linear-gradient(145deg, var(--cover-a, var(--paper-3)), var(--cover-b, var(--paper-2)));
+  box-shadow: 0 0 0 1px var(--shade-1);
+}
+
+.now .cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.now .cover .g {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--clay-ink);
+  font-size: 18px;
+  opacity: 0.7;
+}
+
+.now .meta {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+
+.now .song {
+  overflow: hidden;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.now .who {
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.now .like {
+  display: grid;
+  place-items: center;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--clay);
+}
+
+.now .like svg {
+  width: 16px;
+  height: 16px;
+}
+
+.center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+/* 页面唯一的实心控制：陶土橡胶圆点 */
+.ctrl-main {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    120% 110% at 50% 18%,
+    var(--clay-hi),
+    var(--clay) 48%,
+    var(--clay-lo)
+  );
+  box-shadow:
+    inset 0 1px 0.5px var(--hi),
+    0 6px 12px -4px var(--shade-3);
+  color: var(--clay-ink);
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.ctrl-main:hover {
+  transform: scale(1.04);
+}
+
+.ctrl-main:active {
+  transform: scale(0.97);
+}
+
+.ctrl-main svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+
+.ctrl-main.loading svg {
+  opacity: 0.7;
+}
+
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  max-width: 520px;
+}
+
+.time {
+  width: 36px;
+  flex: none;
+  color: var(--text-tertiary);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.time.right {
+  text-align: right;
+}
+
+/*
+ * 进度条的逐帧路径只写 --p，位置全部由合成属性消费：
+ *   .fill → scaleX，不产生布局；.knob → translate3d，不产生布局。
+ * 两者都不在逐帧路径上碰 width / left，因此播放时每帧不产生 Layout。
+ * --rail-w 由 useRailWidth 在尺寸变化时写入（像素），逐帧路径不读布局。
+ */
+.bar {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  height: 14px;
+  cursor: pointer;
+  touch-action: none;
+  /* 旋钮位移不向外传播重排 */
+  contain: layout;
+}
+
+.bar .rail {
+  width: 100%;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--paper-3);
+  /* 填充变化的重绘范围锁在这条 3px 高光带内 */
+  contain: paint;
+}
+
+.bar .fill {
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--clay);
+  transform: scaleX(var(--p, 0));
+  transform-origin: left center;
+}
+
+.bar .knob {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--sheet);
+  box-shadow:
+    0 0 0 1px var(--clay),
+    0 2px 6px var(--shade-2);
+  opacity: 0;
+  transform: translate3d(calc(var(--p, 0) * var(--rail-w, 0px) - 50%), -50%, 0);
+  transition: opacity var(--dur-fast);
+}
+
+/*
+ * 只在播放态挂 will-change：暂停即撤，避免常驻合成层吃掉 §8.1 的 GPU 预算。
+ * data-playing 由 progress-driver 在 play / pause 事件里维护。
+ */
+html[data-playing='true'] .bar .fill,
+html[data-playing='true'] .bar .knob {
+  will-change: transform;
+}
+
+.bar:hover .knob,
+.bar.dragging .knob {
+  opacity: 1;
+}
+
+.right-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-1);
+}
+
+.queue-btn {
+  position: relative;
+  margin-right: 2px;
+}
+
+.queue-btn .badge {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  padding: 0 3px;
+  border-radius: 9px;
+  background: var(--clay);
+  color: var(--clay-ink);
+  font-size: 8.5px;
+  font-weight: 500;
+}
+
+.volume {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 104px;
+  margin-left: 2px;
+}
+
+.volume .vbar {
+  position: relative;
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--paper-3);
+  cursor: pointer;
+  /* 与进度条同构：逐帧只写 --p，位置交给合成属性。
+     注意不加 paint 包含：旋钮比本条高，会被裁掉。 */
+  contain: layout;
+}
+
+.volume .vbar i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  border-radius: 2px;
+  background: var(--text-secondary);
+  transform: scaleX(var(--p, 0));
+  transform-origin: left center;
+}
+
+.volume .vknob {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sheet);
+  box-shadow: 0 0 0 1px var(--rule-strong);
+  transform: translate3d(calc(var(--p, 0) * var(--rail-w, 0px) - 50%), -50%, 0);
+  pointer-events: none;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  margin-left: 6px;
+  padding: 0 var(--sp-3);
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: 0 0 0 1px var(--shade-1);
+  color: var(--text-secondary);
+  font-size: 11px;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.theme-toggle:hover {
+  background: var(--paper-2);
+  color: var(--text);
+}
+
+.theme-toggle svg {
+  width: 13px;
+  height: 13px;
+}
+
+.playing-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px var(--sp-2);
+  border-radius: 999px;
+  background: var(--clay-soft);
+  color: var(--accent-text);
+  font-size: 10.5px;
+}
+
+.playing-badge svg {
+  width: 11px;
+  height: 11px;
+}

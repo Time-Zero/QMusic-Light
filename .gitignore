@@ -1,0 +1,23 @@
+node_modules/
+dist/
+dist-ssr/
+apps/desktop/src-tauri/target/
+
+# 本地平台层数据（DB / 凭证 / guid）
+apps/desktop/.data/
+.data/
+
+# 开发日志与临时探测脚本
+dev.log
+dev.err.log
+preview.log
+preview.err.log
+.probe/
+.playwright-cli/
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.local
