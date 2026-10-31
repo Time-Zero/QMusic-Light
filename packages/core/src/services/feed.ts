@@ -79,4 +79,27 @@ export class FeedService {
     }
     return songs.slice(0, num);
   }
+
+  /** 私人雷达（首页「雷达模式」入口）：VecSongs[].Track 才是歌曲本体，每页 10 首 */
+  async radar(page = 1): Promise<{ songs: Song[]; hasMore: boolean }> {
+    const data = asObj(await this.api.radar(page));
+    const tracks = asArr(data.VecSongs).map((item) => asObj(item).Track ?? item);
+    return { songs: toSongs(tracks), hasMore: Boolean(data.HasMore) };
+  }
+
+  /** 雷达播放队列：翻页凑够 num 首，上游每页 10 首 */
+  async radarSongs(num = 30): Promise<Song[]> {
+    const songs: Song[] = [];
+    const seen = new Set<string>();
+    for (let page = 1; page <= 5 && songs.length < num; page += 1) {
+      const batch = await this.radar(page);
+      for (const song of batch.songs) {
+        if (seen.has(song.mid)) continue;
+        seen.add(song.mid);
+        songs.push(song);
+      }
+      if (!batch.hasMore) break;
+    }
+    return songs.slice(0, num);
+  }
 }

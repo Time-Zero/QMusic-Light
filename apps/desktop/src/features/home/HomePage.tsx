@@ -32,7 +32,7 @@ export default function HomePage() {
   const setCrumb = useUiStore((s) => s.setCrumb);
   const playQueue = usePlayerStore((s) => s.playQueue);
   const playSong = usePlayerStore((s) => s.playSong);
-  const radioBusy = useRef(false);
+  const generating = useRef(false);
 
   useEffect(() => setCrumb('发现'), [setCrumb]);
 
@@ -96,29 +96,37 @@ export default function HomePage() {
     }
   };
 
-  /** 推荐流里的功能入口卡没有歌单 id，按标题/id 映射到站内能力（猜你喜欢 → 个性电台） */
+  /** 推荐流里的功能入口卡没有歌单 id，按标题/id 映射到站内能力 */
   const isRadioCard = (card: FeedCard) => card.id === '99' || card.title.includes('猜你喜欢');
+  const isRadarCard = (card: FeedCard) => card.id === '22000' || card.title.includes('雷达模式');
 
-  const playRadio = async () => {
-    if (radioBusy.current) return;
-    radioBusy.current = true;
+  const playGenerated = async (
+    kind: 'radio' | 'radar',
+    load: () => Promise<Song[]>,
+    label: string,
+  ) => {
+    if (generating.current) return;
+    generating.current = true;
     try {
       const songs = await queryClient.fetchQuery({
-        queryKey: ['radio', account?.uin ?? 'guest', 15],
-        queryFn: () => core.feed.radio(15),
+        queryKey: [kind, account?.uin ?? 'guest', label],
+        queryFn: load,
         staleTime: TTL.feed,
       });
       if (songs.length === 0) {
-        toast('个性电台暂时没有返回歌曲，稍后再试', 'error');
+        toast(`${label}暂时没有返回歌曲，稍后再试`, 'error');
         return;
       }
-      await playQueue(songs, 0, '猜你喜欢');
+      await playQueue(songs, 0, label);
     } catch (error) {
-      toast(error instanceof Error ? error.message : '个性电台加载失败', 'error');
+      toast(error instanceof Error ? error.message : `${label}加载失败`, 'error');
     } finally {
-      radioBusy.current = false;
+      generating.current = false;
     }
   };
+
+  const playRadio = () => playGenerated('radio', () => core.feed.radio(15), '猜你喜欢');
+  const playRadar = () => playGenerated('radar', () => core.feed.radarSongs(30), '雷达模式');
 
   const openCard = (card: FeedCard) => {
     if (card.type === 'playlist' && card.playlistId) {
@@ -133,6 +141,10 @@ export default function HomePage() {
       void playRadio();
       return;
     }
+    if (isRadarCard(card)) {
+      void playRadar();
+      return;
+    }
     if (/每日\s*30\s*首/.test(card.title)) {
       navigate('/daily');
       return;
@@ -143,6 +155,7 @@ export default function HomePage() {
   const playCard = (card: FeedCard) => {
     if (card.type === 'song' && card.song) void playSong(card.song);
     else if (isRadioCard(card)) void playRadio();
+    else if (isRadarCard(card)) void playRadar();
     else openCard(card);
   };
 
@@ -159,6 +172,8 @@ export default function HomePage() {
     const cards: FeedCard[] = [];
     for (const section of feed.data ?? []) {
       for (const card of section.cards) {
+        // 「快听」是 App 内竖屏短视频片段流（openQuickListenSubPage），没有可调用的 CGI，站内无法还原
+        if (card.id === '22001' || card.title === '快听') continue;
         const key = `${card.type}-${card.id}`;
         if (seen.has(key)) continue;
         seen.add(key);

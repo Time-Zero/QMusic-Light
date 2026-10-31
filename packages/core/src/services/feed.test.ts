@@ -64,3 +64,65 @@ describe('FeedService.radio', () => {
     expect(transport.call).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('FeedService.radar', () => {
+  it('拆开 VecSongs[].Track 并透传 HasMore', async () => {
+    const transport: ApiTransport = {
+      call: vi.fn(async () => ({
+        code: 0,
+        req_0: {
+          code: 0,
+          data: { VecSongs: [{ Track: track(0) }, { Track: track(1) }], HasMore: true },
+        },
+      })),
+      legacy: vi.fn(async () => ({})),
+    };
+    const service = new FeedService(new QqApi(transport), createMemoryCache(), {} as never);
+
+    const page = await service.radar(1);
+    expect(page.songs.map((song) => song.mid)).toEqual(['m0', 'm1']);
+    expect(page.hasMore).toBe(true);
+    const call = transport.call as ReturnType<typeof vi.fn>;
+    expect(call.mock.calls[0][0].param).toEqual({ Page: 1, ReqType: 0 });
+  });
+
+  it('radarSongs 翻页凑够数量，最后一页没有更多就停', async () => {
+    let pageNo = 0;
+    const transport: ApiTransport = {
+      call: vi.fn(async () => {
+        pageNo += 1;
+        return {
+          code: 0,
+          req_0: {
+            code: 0,
+            data: {
+              VecSongs: [{ Track: track(pageNo * 2) }, { Track: track(pageNo * 2 + 1) }],
+              HasMore: pageNo < 3,
+            },
+          },
+        };
+      }),
+      legacy: vi.fn(async () => ({})),
+    };
+    const service = new FeedService(new QqApi(transport), createMemoryCache(), {} as never);
+
+    const songs = await service.radarSongs(5);
+    expect(songs.map((song) => song.mid)).toEqual(['m2', 'm3', 'm4', 'm5', 'm6']);
+    expect(transport.call).toHaveBeenCalledTimes(3);
+  });
+
+  it('HasMore=false 时只请求一页', async () => {
+    const transport: ApiTransport = {
+      call: vi.fn(async () => ({
+        code: 0,
+        req_0: { code: 0, data: { VecSongs: [{ Track: track(0) }], HasMore: false } },
+      })),
+      legacy: vi.fn(async () => ({})),
+    };
+    const service = new FeedService(new QqApi(transport), createMemoryCache(), {} as never);
+
+    const songs = await service.radarSongs(30);
+    expect(songs).toHaveLength(1);
+    expect(transport.call).toHaveBeenCalledTimes(1);
+  });
+});
