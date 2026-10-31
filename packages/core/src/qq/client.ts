@@ -38,6 +38,19 @@ export function unwrapCgi(raw: unknown, endpoint: string): unknown {
       endpoint,
     );
   }
+  // 写接口（musicasset 系列）即使 req_0.code=0 也可能用 data.retCode 报告失败
+  const data = payload.data;
+  if (data && typeof data === 'object') {
+    const record = data as Record<string, unknown>;
+    const retCode = typeof record.retCode === 'number' ? record.retCode : 0;
+    if (retCode !== 0) {
+      throw new QqApiError(
+        typeof record.msg === 'string' && record.msg ? record.msg : `接口业务错误 ${retCode}`,
+        retCode,
+        endpoint,
+      );
+    }
+  }
   return payload.data ?? payload;
 }
 
@@ -129,6 +142,9 @@ export class QqApi {
       ep,
       {
         dirId: 201,
+        tid: 0,
+        // 不带 bFmtUtf8 时返回体的中文字段是 GBK，读取方会拿到乱码
+        bFmtUtf8: true,
         v_songInfo: [{ songMid: song.mid, songId: song.id, songType: song.songType }],
       },
       COMM.app,

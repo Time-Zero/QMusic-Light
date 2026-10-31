@@ -46,6 +46,19 @@ fn session_headers(credentials: Option<&Credentials>, guid: &str) -> Vec<(String
     }
 }
 
+/// musicu 的 URL：有登录态时补 `g_tk`。
+/// 写接口（如 PlaylistDetailWrite/AddSonglist）缺 `g_tk` 会直接返回业务码 500026，
+/// 读接口带上无副作用，因此统一附加。
+fn musicu_url(credentials: Option<&Credentials>) -> String {
+    match credentials {
+        Some(credentials) if !credentials.musickey.is_empty() => {
+            let gtk = hash33(&credentials.musickey, 5381);
+            format!("{MUSICU}?format=json&g_tk={gtk}")
+        }
+        _ => MUSICU.to_string(),
+    }
+}
+
 /// api.call：comm.uin / qm_keyst 由平台强制覆盖，JS 传入无效（文档 §5.3）。
 pub async fn api_call(
     net: &Net,
@@ -94,8 +107,9 @@ pub async fn api_call(
     let mut headers = headers;
     headers.extend(session_headers(credentials, guid));
 
+    let url = musicu_url(credentials);
     let response = net
-        .request_with_retry(MUSICU, "POST", &headers, Some(payload.to_string()))
+        .request_with_retry(url.as_str(), "POST", &headers, Some(payload.to_string()))
         .await?;
     Ok(response.json_loose())
 }
@@ -189,6 +203,22 @@ mod tests {
         assert!(ALLOWED.contains(&"music.vkey.GetVkey/UrlGetVkey"));
         assert!(ALLOWED.contains(&"music.search.SearchCgiService/DoSearchForQQMusicDesktop"));
         assert!(!ALLOWED.contains(&"music.login.LoginServer/QQLogin"));
+    }
+
+    #[test]
+    fn musicu_url_carries_g_tk_when_logged_in() {
+        // 写接口缺 g_tk 会被服务端判为业务码 500026
+        assert_eq!(musicu_url(None), MUSICU);
+
+        let credentials = Credentials {
+            musickey: "abc".into(),
+            ..Default::default()
+        };
+        let url = musicu_url(Some(&credentials));
+        let expected = hash33("abc", 5381);
+        assert!(url.starts_with(MUSICU));
+        assert!(url.contains(&format!("g_tk={expected}")));
+        assert!(url.contains("format=json"));
     }
 
     #[test]

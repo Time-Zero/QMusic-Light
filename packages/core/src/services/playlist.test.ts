@@ -80,6 +80,32 @@ describe('PlaylistService', () => {
     const request = (transport.call as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(request.param.song_num).toBe(500);
   });
+
+  it('红心写入走 dirId=201 + bFmtUtf8 + App comm', async () => {
+    const transport: ApiTransport = {
+      call: vi.fn(async () => ({ code: 0, req_0: { code: 0, data: { retCode: 0, msg: '' } } })),
+      legacy: vi.fn(async () => ({})),
+    };
+    const service = new PlaylistService(new QqApi(transport), createMemoryCache());
+    await service.addLike(account, { mid: 'm1', id: 1, songType: 0 } as never);
+
+    const request = (transport.call as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(request.module).toBe('music.musicasset.PlaylistDetailWrite');
+    expect(request.method).toBe('AddSonglist');
+    expect(request.param.dirId).toBe(201);
+    expect(request.param.bFmtUtf8).toBe(true);
+    expect(request.param.v_songInfo).toEqual([{ songMid: 'm1', songId: 1, songType: 0 }]);
+    expect(request.comm).toMatchObject({ ct: 11, tmeAppID: 'qqmusic' });
+  });
+
+  it('写接口 data.retCode 非 0 也算失败', async () => {
+    const transport: ApiTransport = {
+      call: vi.fn(async () => ({ code: 0, req_0: { code: 0, data: { retCode: 500026, msg: '操作失败' } } })),
+      legacy: vi.fn(async () => ({})),
+    };
+    const api = new QqApi(transport);
+    await expect(api.addLike({ mid: 'm1', id: 1, songType: 0 })).rejects.toThrow('操作失败');
+  });
 });
 
 describe('SearchService', () => {

@@ -298,7 +298,7 @@ function hash33(s: string, seed = 0) {
 1. **Cookie 超长**：部分 Cookie 超过 255 字符会导致请求头异常，只保留 `uin/qqmusic_uin/qm_keyst/qqmusic_key/guid/encryptUin` 即可。
 2. **微信登录**：需要 y.qq.com 的开放平台 appid（`wx48db31d50e334801`），链路是长轮询 `lp.open.weixin.qq.com/connect/l/qrconnect`，比 QQ 扫码多一层；建议 P1 再做。
 3. **`GetPlaylistByUin` 返回 80030**：未登录或 uin 不匹配；不是接口坏了。
-4. **"我喜欢"写操作**：Web comm 被拒（80105），必须 `ct=11, cv=13020508, tmeAppID=qqmusic`。
+4. **"我喜欢"写操作**：Web comm 被拒（80105），必须 `ct=11, cv=13020508, tmeAppID=qqmusic`；且 musicu 请求必须带 `g_tk=hash33(musickey, 5381)`，缺了直接返回 `500026`（读接口不受影响，容易误判成账号问题）。
 5. **每日 30 首不是固定歌单 id**：每天由推荐流下发，必须"先取 feed 再取详情"，并按日期缓存。
 6. **`PlaylistDetail` 分页**：`song_num` 单次最多 500，超过要翻页；顺序用 `orderlist=1`。
 7. **搜索结果为空**：检查 `comm` 是否 Desktop（`ct=19`）以及是否缺 Referer。
