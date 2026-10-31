@@ -1,8 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { TTL } from '@core';
 import type { FeedCard, Playlist, Song } from '@qmusic/shared-types';
 import { ArrowRight, Heart, LogIn, MoreHorizontal, Play, RefreshCw, TriangleAlert } from 'lucide-react';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCore } from '@/app/core-context';
 import { useAccount } from '@/features/auth/session-store';
@@ -28,9 +28,11 @@ export default function HomePage() {
   const core = useCore();
   const navigate = useNavigate();
   const account = useAccount();
+  const queryClient = useQueryClient();
   const setCrumb = useUiStore((s) => s.setCrumb);
   const playQueue = usePlayerStore((s) => s.playQueue);
   const playSong = usePlayerStore((s) => s.playSong);
+  const radioBusy = useRef(false);
 
   useEffect(() => setCrumb('发现'), [setCrumb]);
 
@@ -94,16 +96,53 @@ export default function HomePage() {
     }
   };
 
+  /** 推荐流里的功能入口卡没有歌单 id，按标题/id 映射到站内能力（猜你喜欢 → 个性电台） */
+  const isRadioCard = (card: FeedCard) => card.id === '99' || card.title.includes('猜你喜欢');
+
+  const playRadio = async () => {
+    if (radioBusy.current) return;
+    radioBusy.current = true;
+    try {
+      const songs = await queryClient.fetchQuery({
+        queryKey: ['radio', account?.uin ?? 'guest', 15],
+        queryFn: () => core.feed.radio(15),
+        staleTime: TTL.feed,
+      });
+      if (songs.length === 0) {
+        toast('个性电台暂时没有返回歌曲，稍后再试', 'error');
+        return;
+      }
+      await playQueue(songs, 0, '猜你喜欢');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : '个性电台加载失败', 'error');
+    } finally {
+      radioBusy.current = false;
+    }
+  };
+
   const openCard = (card: FeedCard) => {
     if (card.type === 'playlist' && card.playlistId) {
       navigate(`/playlist/${card.playlistId}?kind=public`);
-    } else if (card.type === 'song' && card.song) {
-      void playSong(card.song);
+      return;
     }
+    if (card.type === 'song' && card.song) {
+      void playSong(card.song);
+      return;
+    }
+    if (isRadioCard(card)) {
+      void playRadio();
+      return;
+    }
+    if (/每日\s*30\s*首/.test(card.title)) {
+      navigate('/daily');
+      return;
+    }
+    toast(`「${card.title}」当前版本暂未支持`);
   };
 
   const playCard = (card: FeedCard) => {
     if (card.type === 'song' && card.song) void playSong(card.song);
+    else if (isRadioCard(card)) void playRadio();
     else openCard(card);
   };
 

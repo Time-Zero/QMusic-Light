@@ -163,8 +163,8 @@ export class QqApi {
     return this.call(EP.radar, { Page: page, ReqType: 0 });
   }
 
-  radio(num = 10) {
-    return this.call(EP.radio, { id: 99, num, from: 0, scene: 0 });
+  radio(num = 10, from = 0) {
+    return this.call(EP.radio, { id: 99, num, from, scene: 0 });
   }
 
   vip() {

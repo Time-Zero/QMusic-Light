@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { TTL } from '@core';
-import { LogIn, Music4, Settings } from 'lucide-react';
+import { Heart, LogIn, Music4, Settings } from 'lucide-react';
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { navItems } from '@/app/registry';
 import { useCore } from '@/app/core-context';
@@ -9,6 +10,20 @@ import { coverVars } from '@/shared/lib/color';
 import { cn } from '@/shared/lib/cn';
 import { initials } from '@/shared/lib/format';
 import { toast } from '@/shared/ui/ui-store';
+
+/** 侧栏歌单缩略图：有封面显示封面，缺图 / 加载失败回退到渐变块 + 音符图标 */
+function PlaylistThumb({ cover }: { cover?: string }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <i className="dot" aria-hidden="true">
+      {cover && !failed ? (
+        <img src={cover} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />
+      ) : (
+        <Music4 size={12} />
+      )}
+    </i>
+  );
+}
 
 export function Sidebar() {
   const core = useCore();
@@ -88,6 +103,7 @@ export function Sidebar() {
       {/* fade-label：折叠时整块淡出（不 display:none，否则栏宽动画期间列表会瞬间消失又瞬间长出） */}
       <div className="side-scroll fade-label">
         <div className="side-label">
+          <Music4 className="label-icon" size={13} aria-hidden="true" />
           我的歌单
           <button
             type="button"
@@ -105,7 +121,7 @@ export function Sidebar() {
             onClick={() => navigate('/login')}
           >
             <i className="dot">
-              <Music4 size={12} color="#cfd4dc" />
+              <Music4 size={12} />
             </i>
             <span>登录后同步你的歌单</span>
           </button>
@@ -121,18 +137,21 @@ export function Sidebar() {
               style={coverVars(playlist.id)}
               aria-label={playlist.title}
             >
-              <i className="dot" />
+              <PlaylistThumb cover={playlist.cover} />
               <span title={playlist.title}>{playlist.title}</span>
             </Link>
           ))
         ) : (
           <div className="pl-item" aria-disabled="true">
-            <i className="dot" />
+            <PlaylistThumb />
             <span>{mine.isLoading ? '加载中…' : '暂无自建歌单'}</span>
           </div>
         )}
 
-        <div className="side-label">收藏的歌单</div>
+        <div className="side-label">
+          <Heart className="label-icon" size={13} aria-hidden="true" />
+          收藏的歌单
+        </div>
         {collected.data && collected.data.length > 0 ? (
           collected.data.slice(0, 14).map((playlist) => (
             <Link
@@ -145,13 +164,13 @@ export function Sidebar() {
               style={coverVars(playlist.id)}
               aria-label={playlist.title}
             >
-              <i className="dot" />
+              <PlaylistThumb cover={playlist.cover} />
               <span title={playlist.title}>{playlist.title}</span>
             </Link>
           ))
         ) : (
           <div className="pl-item" aria-disabled="true">
-            <i className="dot" />
+            <PlaylistThumb />
             <span>{account ? (collected.isLoading ? '加载中…' : '暂无收藏歌单') : '登录后显示'}</span>
           </div>
         )}

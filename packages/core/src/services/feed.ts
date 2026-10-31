@@ -1,4 +1,4 @@
-import type { Account, FeedSection, Playlist } from '@qmusic/shared-types';
+import type { Account, FeedSection, Playlist, Song } from '@qmusic/shared-types';
 import type { QqApi } from '../qq/client';
 import { COMM } from '../qq/endpoints';
 import { asArr, asObj, findDailyPlaylistId, mapFeed, mapSquare, toSongs } from '../qq/mappers';
@@ -56,10 +56,27 @@ export class FeedService {
     return result;
   }
 
-  /** 猜你喜欢 / 私人电台 */
-  async radio(num = 10) {
-    const data = await this.api.radio(num);
-    const tracks = asObj(data).tracks;
-    return toSongs(tracks ?? (asArr(asObj(data).v_track).length > 0 ? asObj(data).v_track : data));
+  /**
+   * 猜你喜欢 / 个性电台。
+   * 上游单次只给 5 首左右（num 会被忽略），按实际返回条数推进 from 翻页凑够 num 首。
+   */
+  async radio(num = 10): Promise<Song[]> {
+    const songs: Song[] = [];
+    const seen = new Set<string>();
+    let from = 0;
+    // 兜底上限：避免上游反复返回同一批时死循环
+    for (let round = 0; round < 8 && songs.length < num; round += 1) {
+      const data = await this.api.radio(num, from);
+      const raw = asObj(data);
+      const tracks = toSongs(raw.tracks ?? (asArr(raw.v_track).length > 0 ? raw.v_track : data));
+      if (tracks.length === 0) break;
+      for (const song of tracks) {
+        if (seen.has(song.mid)) continue;
+        seen.add(song.mid);
+        songs.push(song);
+      }
+      from += tracks.length;
+    }
+    return songs.slice(0, num);
   }
 }

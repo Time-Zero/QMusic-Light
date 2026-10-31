@@ -120,6 +120,47 @@ describe('歌单映射', () => {
     expect(playlist?.creator).toBe('张大佛爷');
     expect(playlist?.kind).toBe('public');
   });
+
+  it('自建歌单的 dirName / picUrl / songNum 也能映射', () => {
+    const playlist = toPlaylist(
+      {
+        dirId: 1,
+        dirName: '深夜循环',
+        tid: 9771376220,
+        songNum: 30,
+        play_cnt: 12,
+        picUrl: 'http://music-file.y.qq.com/a.jpg',
+        nick: '',
+        v_tag: [],
+      },
+      'created',
+    );
+    expect(playlist?.title).toBe('深夜循环');
+    expect(playlist?.cover).toBe('https://music-file.y.qq.com/a.jpg');
+    expect(playlist?.songCount).toBe(30);
+    expect(playlist?.dirid).toBe(1);
+    expect(playlist?.kind).toBe('created');
+  });
+
+  it('收藏歌单扁平结构的 logo 作为封面', () => {
+    const playlist = toPlaylist(
+      {
+        tid: 1363710122,
+        dirId: 1,
+        name: '收藏来的歌单',
+        songnum: 68,
+        logo: 'http://y.qq.com/mediastyle/global/img/playlist_300.png',
+        albumPicUrl: 'http://y.gtimg.cn/music/photo_new/T002R300x300M000abc.jpg',
+        nickname: 'someone',
+        dirType: 0,
+      },
+      'collected',
+    );
+    expect(playlist?.title).toBe('收藏来的歌单');
+    expect(playlist?.cover).toBe('https://y.qq.com/mediastyle/global/img/playlist_300.png');
+    expect(playlist?.creator).toBe('someone');
+    expect(playlist?.songCount).toBe(68);
+  });
 });
 
 describe('推荐流映射', () => {

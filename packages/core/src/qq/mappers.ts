@@ -145,12 +145,24 @@ export function toPlaylist(rawInput: unknown, kind: PlaylistKind = 'public'): Pl
     dirid: num(source.dirid, source.dirId, raw.dirid),
     title: decodeEntities(str(source.title, source.name, source.dirName)),
     cover: playlistCoverUrl(
-      str(cover.default_url, cover.small_url, cover.big_url, source.picurl, source.cover, source.picUrl),
+      str(
+        cover.default_url,
+        cover.small_url,
+        cover.big_url,
+        // 收藏歌单接口（favPlaylists）用 logo / albumPicUrl，自建歌单用 picUrl
+        source.logo,
+        source.picurl,
+        source.picUrl,
+        source.albumPicUrl,
+        source.cover,
+      ),
     ),
     description: decodeEntities(str(source.desc, source.description)),
     songCount: num(source.song_cnt, source.songnum, source.songNum, source.total_song_num),
     playCount: num(source.play_cnt, source.listennum, source.listenNum),
-    creator: decodeEntities(str(creator.nick, source.host_nick, source.nickname, source.creator)),
+    creator: decodeEntities(
+      str(creator.nick, source.host_nick, source.nickname, source.nick, source.creator),
+    ),
     kind,
     tags: asArr<Raw>(source.v_tag)
       .map((t) => str(t.name))
