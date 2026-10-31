@@ -6,9 +6,6 @@ import {
   Moon,
   Pause,
   Play,
-  Repeat,
-  Repeat1,
-  Shuffle,
   SkipBack,
   SkipForward,
   Sun,
@@ -28,6 +25,7 @@ import { formatDuration, singerNames } from '@/shared/lib/format';
 import { CoverImage } from '@/shared/ui/CoverImage';
 import { ProgressBar } from '@/shared/ui/ProgressBar';
 import { toast } from '@/shared/ui/ui-store';
+import { PlayModeButton } from './PlayModeButton';
 import { useCurrentSong, usePlayerStore } from './player-store';
 import { TrackTime } from './TrackTime';
 
@@ -40,7 +38,6 @@ export function PlayerBar() {
   const playing = usePlayerStore((s) => s.playing);
   const loading = usePlayerStore((s) => s.loading);
   const duration = usePlayerStore((s) => s.duration);
-  const mode = usePlayerStore((s) => s.mode);
   const volume = usePlayerStore((s) => s.volume);
   const muted = usePlayerStore((s) => s.muted);
   const queueLength = usePlayerStore((s) => s.queue.length);
@@ -48,8 +45,6 @@ export function PlayerBar() {
   const next = usePlayerStore((s) => s.next);
   const prev = usePlayerStore((s) => s.prev);
   const seek = usePlayerStore((s) => s.seek);
-  const setMode = usePlayerStore((s) => s.setMode);
-  const cycleMode = usePlayerStore((s) => s.cycleMode);
   const setVolume = usePlayerStore((s) => s.setVolume);
   const toggleMute = usePlayerStore((s) => s.toggleMute);
   const setShowQueue = usePlayerStore((s) => s.setShowQueue);
@@ -150,14 +145,7 @@ export function PlayerBar() {
 
       <div className="center">
         <div className="controls">
-          <button
-            type="button"
-            className={cn('icon-btn', mode === 'shuffle' && 'is-active')}
-            title="随机播放"
-            onClick={() => setMode(mode === 'shuffle' ? 'order' : 'shuffle')}
-          >
-            <Shuffle />
-          </button>
+          <PlayModeButton />
           <button type="button" className="icon-btn" title="上一首" onClick={() => void prev()}>
             <SkipBack fill="currentColor" />
           </button>
@@ -172,14 +160,8 @@ export function PlayerBar() {
           <button type="button" className="icon-btn" title="下一首" onClick={() => void next()}>
             <SkipForward fill="currentColor" />
           </button>
-          <button
-            type="button"
-            className={cn('icon-btn', mode === 'single' && 'is-active')}
-            title={mode === 'single' ? '单曲循环' : '顺序播放'}
-            onClick={cycleMode}
-          >
-            {mode === 'single' ? <Repeat1 /> : <Repeat />}
-          </button>
+          {/* 与左侧模式按钮等宽的占位，保证播放键仍在视觉中心 */}
+          <span className="icon-btn ctrl-spacer" aria-hidden="true" />
         </div>
 
         <div className="progress-row">

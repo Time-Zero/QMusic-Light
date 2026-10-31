@@ -62,7 +62,7 @@ export const usePlayerStore = create<PlayerState>()(
       duration: 0,
       volume: 0.7,
       muted: false,
-      mode: 'order',
+      mode: 'list',
       showQueue: false,
       showNowPlaying: false,
       contextLabel: '',
@@ -137,8 +137,10 @@ export const usePlayerStore = create<PlayerState>()(
             return;
           }
           if (auto) {
-            const next = nextIndex(get().mode, index, get().queue.length, RNG);
-            if (next !== index) window.setTimeout(() => void get().playAt(next, true), 300);
+            const target = nextIndex(get().mode, index, get().queue.length, RNG);
+            if (target >= 0 && target !== index) {
+              window.setTimeout(() => void get().playAt(target, true), 300);
+            }
           }
         }
       },
@@ -166,6 +168,12 @@ export const usePlayerStore = create<PlayerState>()(
         const { queue, index, mode } = get();
         if (queue.length === 0) return;
         const target = nextIndex(mode, index, queue.length, RNG, manual);
+        if (target < 0) {
+          // 顺序播放走到末尾：自动播完就停住；手动点下一首给个提示，不绕回开头
+          if (manual) toast('已到列表末尾');
+          else set({ playing: false });
+          return;
+        }
         await get().playAt(target, !manual);
       },
 
@@ -178,6 +186,11 @@ export const usePlayerStore = create<PlayerState>()(
           return;
         }
         const target = prevIndex(mode, index, queue.length, RNG);
+        if (target < 0) {
+          // 顺序播放的第一首：没有上一首，退回本曲开头
+          get().seek(0);
+          return;
+        }
         await get().playAt(target);
       },
 
@@ -211,7 +224,7 @@ export const usePlayerStore = create<PlayerState>()(
       setMode: (mode) => set({ mode }),
 
       cycleMode: () => {
-        const order: PlayMode[] = ['order', 'shuffle', 'single'];
+        const order: PlayMode[] = ['list', 'single', 'shuffle', 'order'];
         const next = order[(order.indexOf(get().mode) + 1) % order.length];
         set({ mode: next });
       },
@@ -254,7 +267,16 @@ export const usePlayerStore = create<PlayerState>()(
     }),
     {
       name: 'qmusic:player',
-      version: 1,
+      version: 2,
+      // v1 的 order 语义是「列表循环」，v2 拆成 order（顺序）与 list（列表循环），
+      // 老用户继续按列表循环播放，不改变听感
+      migrate: (persisted, version) => {
+        const state = persisted as Partial<PlayerState>;
+        if (version < 2 && state.mode === 'order') {
+          return { ...state, mode: 'list' } as PlayerState;
+        }
+        return persisted as PlayerState;
+      },
       partialize: (state) => ({
         queue: state.queue,
         index: state.index,
@@ -343,8 +365,9 @@ function preloadNext() {
   const instance = core;
   if (!instance || state.queue.length < 2) return;
   const target = nextIndex(state.mode, state.index, state.queue.length, RNG);
+  if (target < 0 || target === state.index) return;
   const song = state.queue[target];
-  if (!song || target === state.index) return;
+  if (!song) return;
   void prefetchTrack(instance, song).catch(() => undefined);
 }
 

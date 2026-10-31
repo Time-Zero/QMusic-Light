@@ -264,6 +264,12 @@ ol {
   color: var(--accent-text);
 }
 
+/* 不可见占位：让合并后的控制组左右对称，播放键仍居中 */
+.ctrl-spacer {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .pill {
   display: inline-flex;
   align-items: center;

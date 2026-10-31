@@ -27,9 +27,15 @@ const song = (mid: string, duration = 100): Song => ({
 });
 
 describe('队列推进', () => {
-  it('顺序模式循环播放', () => {
+  it('列表循环：末尾回到开头', () => {
+    expect(nextIndex('list', 0, 3)).toBe(1);
+    expect(nextIndex('list', 2, 3)).toBe(0);
+    expect(nextIndex('list', -1, 3)).toBe(0);
+  });
+
+  it('顺序播放：到末尾停下，不回头', () => {
     expect(nextIndex('order', 0, 3)).toBe(1);
-    expect(nextIndex('order', 2, 3)).toBe(0);
+    expect(nextIndex('order', 2, 3)).toBe(-1);
     expect(nextIndex('order', -1, 3)).toBe(0);
   });
 
@@ -50,12 +56,16 @@ describe('队列推进', () => {
 
   it('空队列与单曲队列', () => {
     expect(nextIndex('order', -1, 0)).toBe(-1);
-    expect(nextIndex('order', 0, 1)).toBe(0);
+    expect(nextIndex('list', 0, 1)).toBe(0);
+    expect(nextIndex('order', 0, 1)).toBe(-1);
+    expect(nextIndex('order', 0, 1, Math.random, true)).toBe(0);
     expect(prevIndex('order', -1, 0)).toBe(-1);
   });
 
-  it('上一首顺序回退', () => {
-    expect(prevIndex('order', 0, 3)).toBe(2);
+  it('上一首回退：列表循环绕回，顺序播放开头无上一首', () => {
+    expect(prevIndex('list', 0, 3)).toBe(2);
+    expect(prevIndex('list', 2, 3)).toBe(1);
+    expect(prevIndex('order', 0, 3)).toBe(-1);
     expect(prevIndex('order', 2, 3)).toBe(1);
   });
 });

@@ -4,7 +4,8 @@ export type Rng = () => number;
 
 /**
  * 计算下一首索引。
- * - order：顺序循环
+ * - order：顺序播放，播到末尾返回 -1（不回头）
+ * - list：列表循环，末尾回到开头
  * - single：自动播放结束回到本曲；手动切歌仍走下一首
  * - shuffle：随机但不重复当前曲（列表 > 1 时）
  */
@@ -16,8 +17,9 @@ export function nextIndex(
   manual = false,
 ): number {
   if (length <= 0) return -1;
-  if (length === 1) return 0;
   if (mode === 'single' && !manual) return Math.max(current, 0);
+  // 顺序播放且只有一首：自动播完就停，手动切歌视为重播
+  if (length === 1) return mode === 'order' && !manual ? -1 : 0;
   if (mode === 'shuffle') {
     const base = current < 0 ? 0 : current;
     let candidate = Math.floor(rng() * (length - 1));
@@ -25,6 +27,7 @@ export function nextIndex(
     return Math.min(Math.max(candidate, 0), length - 1);
   }
   const base = current < 0 ? -1 : current;
+  if (mode === 'order' && base >= length - 1) return -1;
   return (base + 1) % length;
 }
 
@@ -37,6 +40,8 @@ export function prevIndex(mode: PlayMode, current: number, length: number, rng: 
     if (candidate >= base) candidate += 1;
     return Math.min(Math.max(candidate, 0), length - 1);
   }
+  // 顺序播放的开头没有上一首，调用方退化为回到本曲开头
+  if (mode === 'order' && current <= 0) return -1;
   const base = current < 0 ? 0 : current;
   return (base - 1 + length) % length;
 }

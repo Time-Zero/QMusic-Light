@@ -182,7 +182,14 @@ export interface SearchResult {
   singers: Page<{ mid: string; name: string; pic: string }>;
 }
 
-export type PlayMode = 'order' | 'shuffle' | 'single';
+/**
+ * 播放模式：
+ * - order：顺序播放，播到列表末尾停止
+ * - list：列表循环，播完回到开头
+ * - single：单曲循环
+ * - shuffle：随机播放
+ */
+export type PlayMode = 'order' | 'list' | 'single' | 'shuffle';
 
 /* ------------------------------------------------------------------ *
  * IPC DTO（文档 §5.3：业务命令面保持很窄）

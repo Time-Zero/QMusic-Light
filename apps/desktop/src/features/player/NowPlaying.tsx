@@ -10,9 +10,6 @@ import {
   MoreHorizontal,
   Pause,
   Play,
-  Repeat,
-  Repeat1,
-  Shuffle,
   SkipBack,
   SkipForward,
   Volume2,
@@ -32,6 +29,7 @@ import { subscribeProgress } from '@/shared/lib/progress-driver';
 import { CoverImage } from '@/shared/ui/CoverImage';
 import { ProgressBar } from '@/shared/ui/ProgressBar';
 import { toast } from '@/shared/ui/ui-store';
+import { PlayModeButton } from './PlayModeButton';
 import { useCurrentSong, usePlayerStore } from './player-store';
 import { TrackTime } from './TrackTime';
 
@@ -146,7 +144,6 @@ export function NowPlaying({ closing = false }: { closing?: boolean }) {
   const playing = usePlayerStore((s) => s.playing);
   const loading = usePlayerStore((s) => s.loading);
   const duration = usePlayerStore((s) => s.duration);
-  const mode = usePlayerStore((s) => s.mode);
   const quality = usePlayerStore((s) => s.streamQuality);
   const setShowNowPlaying = usePlayerStore((s) => s.setShowNowPlaying);
   const setShowQueue = usePlayerStore((s) => s.setShowQueue);
@@ -154,8 +151,6 @@ export function NowPlaying({ closing = false }: { closing?: boolean }) {
   const next = usePlayerStore((s) => s.next);
   const prev = usePlayerStore((s) => s.prev);
   const seek = usePlayerStore((s) => s.seek);
-  const setMode = usePlayerStore((s) => s.setMode);
-  const cycleMode = usePlayerStore((s) => s.cycleMode);
   const preferredQuality = useSettingsStore((s) => s.quality);
 
   const [palette, setPalette] = useState(() => coverPalette(song?.mid ?? ''));
@@ -277,10 +272,7 @@ export function NowPlaying({ closing = false }: { closing?: boolean }) {
           <div className="np-meta">
             <div className="kicker">NOW PLAYING · {song.albumName || '未知专辑'}</div>
             <h1>{song.name}</h1>
-            <div className="sub">
-              {singerNames(song.singers)}
-              {song.payPlay === 1 ? ' · VIP 曲目（不绕过付费限制）' : ''}
-            </div>
+            <div className="sub">{singerNames(song.singers)}</div>
 
             <div className="np-actions">
               <button
@@ -308,7 +300,6 @@ export function NowPlaying({ closing = false }: { closing?: boolean }) {
         <div className="np-lyric-panel">
           <div className="np-lyric-head">
             <h2>歌词</h2>
-            {lines.length > 0 ? <span className="np-lyric-hint">点击任意一句可跳转</span> : null}
           </div>
 
           {lyric.isLoading ? (
@@ -344,14 +335,7 @@ export function NowPlaying({ closing = false }: { closing?: boolean }) {
           <span className="time right">{formatDuration(duration || song.duration || 0)}</span>
         </div>
         <div className="np-controls">
-          <button
-            type="button"
-            className={cn('icon-btn', mode === 'shuffle' && 'is-active')}
-            title="随机播放"
-            onClick={() => setMode(mode === 'shuffle' ? 'order' : 'shuffle')}
-          >
-            <Shuffle />
-          </button>
+          <PlayModeButton />
           <button type="button" className="icon-btn" title="上一首" onClick={() => void prev()}>
             <SkipBack fill="currentColor" />
           </button>
@@ -366,14 +350,8 @@ export function NowPlaying({ closing = false }: { closing?: boolean }) {
           <button type="button" className="icon-btn" title="下一首" onClick={() => void next()}>
             <SkipForward fill="currentColor" />
           </button>
-          <button
-            type="button"
-            className={cn('icon-btn', mode === 'single' && 'is-active')}
-            title={mode === 'single' ? '单曲循环' : '顺序播放'}
-            onClick={cycleMode}
-          >
-            {mode === 'single' ? <Repeat1 /> : <Repeat />}
-          </button>
+          {/* 与左侧模式按钮等宽的占位，保证播放键仍在视觉中心 */}
+          <span className="icon-btn ctrl-spacer" aria-hidden="true" />
         </div>
       </div>
     </section>

@@ -377,23 +377,22 @@
   letter-spacing: 0.12em;
 }
 
-.np-lyric-hint {
-  margin-left: auto;
-  color: var(--text-tertiary);
-  font-size: 11px;
-  opacity: 0.8;
-}
-
 .np-lyrics {
   position: relative;
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding-right: var(--sp-2);
   /* 跟随由 LyricList 自己驱动：瞬移 scrollTop + 位移补间。
      这里必须关掉 scroll-behavior，否则程序化滚动会被浏览器再平滑一遍，
      等于把主线程逐帧滚动又加回来。 */
   scroll-behavior: auto;
+  /* 歌词靠滚轮/触控板滚动，不显示滚动条：视觉上保持一页诗句 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* 滚到边缘时不把滚动链传给外层 */
+  overscroll-behavior: contain;
   /* 歌词内部滚动不向外传播重排 */
   contain: layout;
   mask-image: linear-gradient(180deg, transparent 0, var(--ink) 10%, var(--ink) 90%, transparent 100%);
@@ -404,6 +403,11 @@
     var(--ink) 90%,
     transparent 100%
   );
+}
+
+.np-lyrics::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .np-lyrics.is-empty {
