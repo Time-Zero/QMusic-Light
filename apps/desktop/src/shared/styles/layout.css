@@ -574,6 +574,33 @@
   margin: 0 auto;
 }
 
+/*
+ * 歌单详情：歌曲列表要吃满内容区的剩余高度，所以只有这一页把 .content → .page 打开成一列 flex，
+ * 其余页面仍是普通文档流（高度随内容走，列表维持固定 max-height）。
+ * 两层的 flex 值不是随手写的：
+ *   .content-body 用 1 1 0 精确卡在内容区高度上，页面再高也不会反过来把它撑开；
+ *   .page 用 1 1 auto + 默认的 min-height:auto，正常窗口里长到剩余高度，
+ *   矮窗口里退到内容最小高度并溢出 —— 溢出部分由 .content 自己滚动，列表不会被压没。
+ */
+.content:has(> .content-body > .page > .playlist-page) {
+  display: flex;
+  flex-direction: column;
+}
+
+.content:has(> .content-body > .page > .playlist-page) > .content-body {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+}
+
+.content:has(> .content-body > .page > .playlist-page) > .content-body > .page {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
 /* 标题栏挤不下时先收起说明文字，图标还在 */
 @media (max-width: 1240px) {
   .top-actions .pill-new {

@@ -568,6 +568,28 @@
   scrollbar-color: var(--rule-strong) transparent;
 }
 
+/*
+ * 填充模式（歌单详情）：高度不再由 max-height 定，而是由父级剩余空间定。
+ * 表本身 1 1 0 撑满父级，滚动视口再跟着吃满表内除表头外的空间 —— 全屏/最大化时列表一直画到页面底，
+ * 不会像固定 560px 那样在下面留一条空带。
+ * 底线只留「表头 + 2 行」：再矮的窗口让它到此为止、由外层 .content 滚动，免得列表被压成一条缝。
+ * 底线不能再抬高 —— 抬高就会把 700px 上下的小窗口也推进「整页滚动 + 只露两三行」的尴尬状态。
+ */
+.track-table.is-fill {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  /* 32px = .track-head 的高度，见下方 */
+  min-height: calc(var(--row-h) * 2 + 32px);
+}
+
+.track-table.is-fill .track-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  /* 正常路径的高度由 flex 给，这条是兜底：父级不是 flex 列时（旧内核不认识 :has()）别把上百行一次铺开 */
+  max-height: calc(100vh - 200px);
+}
+
 .track {
   position: relative;
   /* 自成层叠上下文，让悬停底色的负层级伪元素只压在本行背景之上、文字之下 */

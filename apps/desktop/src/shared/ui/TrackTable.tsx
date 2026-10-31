@@ -15,6 +15,8 @@ interface Props {
   likedMids?: ReadonlySet<string>;
   onToggleLike?: (song: Song) => void;
   height?: string | number;
+  /** 吃掉父级剩余高度（父级须是 flex 列，见 .track-table.is-fill）；此时忽略 height */
+  fill?: boolean;
   showAlbum?: boolean;
 }
 
@@ -26,6 +28,7 @@ export function TrackTable({
   likedMids,
   onToggleLike,
   height = 'min(56vh, 520px)',
+  fill = false,
   showAlbum = true,
 }: Props) {
   const virtual = songs.length > 60;
@@ -49,10 +52,10 @@ export function TrackTable({
     overscan: 10,
   });
 
-  const scrollStyle: CSSProperties = { maxHeight: height };
+  const scrollStyle: CSSProperties = fill ? {} : { maxHeight: height };
 
   return (
-    <div className="track-table">
+    <div className={cn('track-table', fill && 'is-fill')}>
       {/*
        * 表头和数据行都住在滚动容器里：滚动条只会同时缩窄两者，
        * 列永远对得上；顺带获得吸顶效果，滚到第 100 首也知道每列是什么。

@@ -981,6 +981,29 @@
   margin-left: auto;
 }
 
+/* ------------------------------ 歌单详情 ------------------------------ */
+/*
+ * 页面本体是一列 flex：hero 保持原高，歌曲列表所在的 .section 拿走剩余高度。
+ * 与 layout.css 里 .content → .page 的高度链、components.css 里 .track-table.is-fill 是一套，
+ * 三处要一起改：漏掉任何一处，列表要么回到固定高度，要么在矮窗口里被挤成 0。
+ */
+.playlist-page {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+/* hero 与错误提示条只按自身内容占高，既不被拉长也不被压扁（只有歌曲列表参与伸缩） */
+.playlist-page > :not(.section) {
+  flex: none;
+}
+
+.playlist-page > .section {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
 /* ------------------------------ 设置页 ------------------------------ */
 .settings-grid {
   display: grid;

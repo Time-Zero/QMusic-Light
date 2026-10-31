@@ -160,7 +160,7 @@ export default function PlaylistPage() {
   const kindLabel = KIND_LABEL[kind] ?? '歌单';
 
   return (
-    <div>
+    <div className="playlist-page">
       <section className="hero" style={coverVars(playlist?.id ?? idParam)}>
         <div className="hero-cover">
           {playlist?.cover ? (
@@ -270,7 +270,7 @@ export default function PlaylistPage() {
               onPlay={(index) => void playQueue(songs, index, playlist?.title ?? '歌单')}
               likedMids={likedMids}
               onToggleLike={(song) => void toggleLike(song)}
-              height="min(56vh, 560px)"
+              fill
             />
             {query.hasNextPage ? (
               <div className="track-list-footer">
