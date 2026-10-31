@@ -21,3 +21,7 @@ preview.err.log
 .DS_Store
 Thumbs.db
 *.local
+.hallmark
+.workbuddy
+release
+
