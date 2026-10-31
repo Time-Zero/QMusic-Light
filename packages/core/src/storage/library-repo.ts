@@ -220,6 +220,14 @@ export class LibraryRepo {
     return (await this.getSetting(`liked:${mid}`)) === '1';
   }
 
+  /** 本地缓存里所有已喜欢的 mid：列表页一次性回填红心，避免逐首查库 */
+  async likedMids(): Promise<string[]> {
+    const rows = await this.db.select("SELECT key FROM setting WHERE key LIKE 'liked:%' AND value = '1'");
+    return rows
+      .map((row) => toStr(row.key).slice('liked:'.length))
+      .filter((mid) => mid.length > 0);
+  }
+
   async setLiked(mid: string, liked: boolean): Promise<void> {
     await this.setSetting(`liked:${mid}`, liked ? '1' : '0');
   }

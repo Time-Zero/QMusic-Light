@@ -18,6 +18,7 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'rea
 import { useNavigate } from 'react-router-dom';
 import { useCore } from '@/app/core-context';
 import { useAccount } from '@/features/auth/session-store';
+import { useLikeActions } from '@/features/library/use-like';
 import { useSettingsStore } from '@/app/settings-store';
 import { IS_TAURI } from '@/bridge';
 import { WindowControls } from '@/shared/components/WindowControls';
@@ -140,6 +141,7 @@ export function NowPlaying({ closing = false }: { closing?: boolean }) {
   const navigate = useNavigate();
   const account = useAccount();
   const song = useCurrentSong();
+  const { likedMids, toggleLike } = useLikeActions();
 
   const playing = usePlayerStore((s) => s.playing);
   const loading = usePlayerStore((s) => s.loading);
@@ -154,7 +156,6 @@ export function NowPlaying({ closing = false }: { closing?: boolean }) {
   const preferredQuality = useSettingsStore((s) => s.quality);
 
   const [palette, setPalette] = useState(() => coverPalette(song?.mid ?? ''));
-  const [liked, setLiked] = useState(false);
 
   const lyric = useQuery({
     queryKey: ['lyric', song?.mid],
@@ -184,36 +185,17 @@ export function NowPlaying({ closing = false }: { closing?: boolean }) {
     };
   }, [song?.mid, song?.cover]);
 
-  useEffect(() => {
-    if (!song) return;
-    let alive = true;
-    void core.repo
-      .isLiked(song.mid)
-      .then((value) => alive && setLiked(value))
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-    };
-  }, [core, song?.mid]);
-
   if (!song) return null;
 
-  const like = async () => {
+  const liked = likedMids.has(song.mid);
+
+  const like = () => {
     if (!account) {
       setShowNowPlaying(false);
       navigate('/login');
       return;
     }
-    try {
-      if (liked) await core.playlists.removeLike(account, song);
-      else await core.playlists.addLike(account, song);
-      const value = !liked;
-      setLiked(value);
-      void core.repo.setLiked(song.mid, value);
-      toast(value ? '已加入我喜欢的音乐' : '已取消喜欢', 'success');
-    } catch (error) {
-      toast(error instanceof Error ? error.message : '操作失败', 'error');
-    }
+    void toggleLike(song);
   };
 
   return (

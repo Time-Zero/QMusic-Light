@@ -24,7 +24,6 @@ export default function DailyPage() {
   const playQueue = usePlayerStore((s) => s.playQueue);
   const playingMid = usePlayerStore((s) => (s.index >= 0 ? s.queue[s.index]?.mid : undefined));
   const playing = usePlayerStore((s) => s.playing);
-  const { likedMids, toggleLike } = useLikeActions();
 
   useEffect(() => setCrumb('发现 / 每日 30 首'), [setCrumb]);
 
@@ -67,6 +66,9 @@ export default function DailyPage() {
     };
   }, [daily.isError, core]);
 
+  const songs = daily.data?.songs ?? cachedSongs;
+  const { likedMids, toggleLike } = useLikeActions(songs);
+
   if (!account) {
     return (
       <div>
@@ -91,7 +93,6 @@ export default function DailyPage() {
     );
   }
 
-  const songs = daily.data?.songs ?? cachedSongs;
   const playlist = detail.data?.playlist;
   const totalDuration = songs.reduce((sum, song) => sum + song.duration, 0);
   const fromCache = Boolean(daily.isError && cachedSongs.length > 0);

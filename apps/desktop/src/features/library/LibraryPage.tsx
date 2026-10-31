@@ -29,7 +29,6 @@ export default function LibraryPage() {
   const playQueue = usePlayerStore((s) => s.playQueue);
   const playingMid = usePlayerStore((s) => (s.index >= 0 ? s.queue[s.index]?.mid : undefined));
   const playing = usePlayerStore((s) => s.playing);
-  const { likedMids, toggleLike } = useLikeActions();
 
   useEffect(() => setCrumb('我的音乐'), [setCrumb]);
 
@@ -56,6 +55,9 @@ export default function LibraryPage() {
     staleTime: TTL.playlistDetail,
     retry: 0,
   });
+
+  const likedSongs = liked.data?.songs ?? [];
+  const { likedMids, toggleLike } = useLikeActions(likedSongs, { allLiked: tab === 'liked' });
 
   if (!account) {
     return (
@@ -87,7 +89,6 @@ export default function LibraryPage() {
 
   const currentList = tab === 'collected' ? collected.data : mine.data;
   const isLoading = tab === 'collected' ? collected.isLoading : mine.isLoading;
-  const likedSongs = liked.data?.songs ?? [];
 
   return (
     <div>

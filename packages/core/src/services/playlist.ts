@@ -102,13 +102,18 @@ export class PlaylistService {
 
   async addLike(account: Account, song: Song): Promise<void> {
     await this.api.addLike(song);
-    this.cache.delete(`mine:${account.uin}`);
-    this.cache.delete(`fav:${account.uin}:0:30`);
+    this.invalidateLikeCaches(account);
   }
 
   async removeLike(account: Account, song: Song): Promise<void> {
     await this.api.delLike(song);
+    this.invalidateLikeCaches(account);
+  }
+
+  /** 红心变更后，所有分页的「我喜欢」详情都要重新拉取 */
+  private invalidateLikeCaches(account: Account): void {
     this.cache.delete(`mine:${account.uin}`);
     this.cache.delete(`fav:${account.uin}:0:30`);
+    this.cache.deletePrefix('diss:0:');
   }
 }

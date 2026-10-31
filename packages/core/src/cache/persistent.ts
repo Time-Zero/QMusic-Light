@@ -65,6 +65,15 @@ export class PersistentCache implements CacheStore {
     void this.db.execute('DELETE FROM cache_entry WHERE key = ?', [key]).catch(() => undefined);
   }
 
+  deletePrefix(prefix: string): void {
+    for (const key of this.mem.keys()) {
+      if (key.startsWith(prefix)) this.mem.delete(key);
+    }
+    void this.db
+      .execute('DELETE FROM cache_entry WHERE key LIKE ?', [`${prefix}%`])
+      .catch(() => undefined);
+  }
+
   clear(): void {
     this.mem.clear();
     void this.db.execute('DELETE FROM cache_entry').catch(() => undefined);

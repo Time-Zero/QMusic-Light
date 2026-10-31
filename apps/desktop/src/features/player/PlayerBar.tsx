@@ -1,4 +1,3 @@
-import { useMutation } from '@tanstack/react-query';
 import {
   Heart,
   ListMusic,
@@ -13,26 +12,20 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useCore } from '@/app/core-context';
+import { useRef, useState, type CSSProperties } from 'react';
 import { useSettingsStore } from '@/app/settings-store';
-import { useAccount } from '@/features/auth/session-store';
+import { useLikeActions } from '@/features/library/use-like';
 import { useRailWidth } from '@/shared/hooks/useRailWidth';
 import { cn } from '@/shared/lib/cn';
 import { coverVars } from '@/shared/lib/color';
 import { formatDuration, singerNames } from '@/shared/lib/format';
 import { CoverImage } from '@/shared/ui/CoverImage';
 import { ProgressBar } from '@/shared/ui/ProgressBar';
-import { toast } from '@/shared/ui/ui-store';
 import { PlayModeButton } from './PlayModeButton';
 import { useCurrentSong, usePlayerStore } from './player-store';
 import { TrackTime } from './TrackTime';
 
 export function PlayerBar() {
-  const core = useCore();
-  const navigate = useNavigate();
-  const account = useAccount();
   const song = useCurrentSong();
 
   const playing = usePlayerStore((s) => s.playing);
@@ -53,54 +46,14 @@ export function PlayerBar() {
   const theme = useSettingsStore((s) => s.theme);
   const toggleTheme = useSettingsStore((s) => s.toggleTheme);
 
-  const [liked, setLiked] = useState(false);
   const volumeRef = useRef<HTMLDivElement>(null);
   const volumeRect = useRef<DOMRect | null>(null);
   const [draggingVolume, setDraggingVolume] = useState(false);
 
   useRailWidth(volumeRef);
 
-  useEffect(() => {
-    if (!song) {
-      setLiked(false);
-      return;
-    }
-    let alive = true;
-    void core.repo
-      .isLiked(song.mid)
-      .then((value) => alive && setLiked(value))
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-    };
-  }, [core, song?.mid]);
-
-  const likeMutation = useMutation({
-    mutationFn: async () => {
-      if (!account || !song) throw new Error('需要登录');
-      if (liked) await core.playlists.removeLike(account, song);
-      else await core.playlists.addLike(account, song);
-    },
-    onSuccess: () => {
-      const nextLiked = !liked;
-      setLiked(nextLiked);
-      if (song) void core.repo.setLiked(song.mid, nextLiked);
-      toast(nextLiked ? '已加入我喜欢的音乐' : '已取消喜欢', 'success');
-    },
-    onError: (error) => {
-      toast(error instanceof Error ? error.message : '操作失败', 'error');
-    },
-  });
-
-  const onToggleLike = () => {
-    if (!account) {
-      toast('登录后才能收藏歌曲');
-      navigate('/login');
-      return;
-    }
-    if (!song) return;
-    likeMutation.mutate();
-  };
+  const { likedMids, toggleLike } = useLikeActions();
+  const liked = song ? likedMids.has(song.mid) : false;
 
   const updateVolume = (clientX: number) => {
     // 拖拽期间复用按下时缓存的几何，不在每次 pointermove 里读布局
@@ -135,7 +88,7 @@ export function PlayerBar() {
           type="button"
           className="like"
           title={liked ? '取消喜欢' : '喜欢'}
-          onClick={onToggleLike}
+          onClick={() => song && void toggleLike(song)}
           disabled={!song}
           style={{ opacity: song ? 1 : 0.3 }}
         >

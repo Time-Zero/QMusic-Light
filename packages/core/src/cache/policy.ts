@@ -21,6 +21,8 @@ export interface CacheStore {
   get<T>(key: string): T | undefined;
   set<T>(key: string, value: T, ttlMs: number): void;
   delete(key: string): void;
+  /** 按前缀失效（例如收藏变更后清掉「我喜欢」的所有分页） */
+  deletePrefix(prefix: string): void;
   clear(): void;
 }
 
@@ -47,6 +49,11 @@ export function createMemoryCache(now: () => number = Date.now): CacheStore {
     },
     delete(key) {
       map.delete(key);
+    },
+    deletePrefix(prefix) {
+      for (const key of map.keys()) {
+        if (key.startsWith(prefix)) map.delete(key);
+      }
     },
     clear() {
       map.clear();

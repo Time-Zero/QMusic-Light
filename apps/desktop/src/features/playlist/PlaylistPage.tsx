@@ -35,7 +35,6 @@ export default function PlaylistPage() {
   const appendQueue = usePlayerStore((s) => s.appendQueue);
   const playingMid = usePlayerStore((s) => (s.index >= 0 ? s.queue[s.index]?.mid : undefined));
   const playing = usePlayerStore((s) => s.playing);
-  const { likedMids, toggleLike } = useLikeActions();
 
   const idParam = params.id ?? '0';
   const isLiked = idParam === '0';
@@ -71,6 +70,7 @@ export default function PlaylistPage() {
     [query.data, cached],
   );
   const total = query.data?.pages[0]?.total ?? songs.length;
+  const { likedMids, toggleLike } = useLikeActions(songs, { allLiked: isLiked });
 
   useEffect(() => {
     const prefix = isLiked || kind === 'created' || kind === 'collected' ? '我的音乐' : '发现';
