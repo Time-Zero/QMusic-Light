@@ -5,9 +5,12 @@ import { Net, cookieHeaderFrom, parseJsonLoose } from './net.mjs';
 
 const QR_TTL = 120 * 1000;
 
-/** ptuiCB('66','0','','0','二维码未失效。', '') —— 注意最后一个参数前可能有空格 */
+/**
+ * ptuiCB('66','0','','0','二维码未失效。', '')
+ * 成功时参数个数不固定（实测为 7 个，第 6 个是昵称），所以只取前 3 个必填项 + 可选文案。
+ */
 const PTUI =
-  /ptuiCB\(\s*'([^']*)'\s*,\s*'([^']*)'\s*,\s*'([^']*)'\s*,\s*'([^']*)'\s*,\s*'([^']*)'\s*,\s*'([^']*)'\s*\)/;
+  /ptuiCB\(\s*'([^']*)'\s*,\s*'([^']*)'\s*,\s*'([^']*)'(?:\s*,\s*'([^']*)')?(?:\s*,\s*'([^']*)')?/;
 
 const STATE_BY_CODE = {
   66: 'waiting',
@@ -20,9 +23,27 @@ const STATE_BY_CODE = {
 /**
  * 步骤 1：二维码生成（文档 §3.2 步骤 1）
  * qrsig 落在 ptlogin2.qq.com，必须用带域匹配的 cookie jar。
+ * 先走一次 xlogin 拿 pt_login_sig：ptqrlogin 带上它，后续 graph 授权才不会被当成陌生设备。
  */
 export async function startQrSession() {
   const net = new Net();
+  const xloginUrl =
+    `${APP_CONFIG.xlogin}?` +
+    new URLSearchParams({
+      appid: APP_CONFIG.appId,
+      daid: APP_CONFIG.daid,
+      style: '33',
+      login_text: '授权并登录',
+      hide_title_bar: '1',
+      hide_border: '1',
+      target: 'self',
+      s_url: `${APP_CONFIG.graphHost}/oauth2.0/login_jump`,
+      pt_3rd_aid: APP_CONFIG.thirdAid,
+      pt_feedback_link: 'https://support.qq.com/products/77942?customInfo=.appid100497308',
+    }).toString();
+  await net.requestWithRetry(xloginUrl);
+  const loginSig = net.jar.get('pt_login_sig', APP_CONFIG.xloginHost) ?? '';
+
   const url =
     `${APP_CONFIG.loginHost}/ptqrshow?appid=${APP_CONFIG.appId}&e=2&l=M&s=3&d=72&v=4` +
     `&t=${Math.random()}&daid=${APP_CONFIG.daid}&pt_3rd_aid=${APP_CONFIG.thirdAid}`;
@@ -37,6 +58,7 @@ export async function startQrSession() {
     qrId: randomUUID(),
     net,
     qrsig,
+    loginSig,
     imageDataUrl: `data:image/png;base64,${buffer.toString('base64')}`,
     createdAt: Date.now(),
     expiresAt: Date.now() + QR_TTL,
@@ -67,7 +89,8 @@ export async function pollQrSession(session) {
   const url =
     `${APP_CONFIG.loginHost}/ptqrlogin?u1=${encodeURIComponent('https://graph.qq.com/oauth2.0/login_jump')}` +
     `&ptqrtoken=${token}&ptredirect=0&h=1&t=1&g=1&from_ui=1&ptlang=2052` +
-    `&action=0-0-${Date.now()}&js_ver=20102616&js_type=1&pt_uistyle=40` +
+    `&action=0-0-${Date.now()}&js_ver=20102616&js_type=1` +
+    `&login_sig=${encodeURIComponent(session.loginSig ?? '')}&pt_uistyle=40` +
     `&aid=${APP_CONFIG.appId}&daid=${APP_CONFIG.daid}&pt_3rd_aid=${APP_CONFIG.thirdAid}&has_onekey=1`;
 
   const res = await session.net.requestWithRetry(url);
@@ -130,39 +153,37 @@ async function completeLogin(net, checkSigUrl) {
 
   const gTk = hash33(pSkey, 5381);
   const redirectUri = APP_CONFIG.redirectUri;
+  const state = randomUUID().replace(/-/g, '').slice(0, 16);
 
-  // 5. OAuth authorize：拿到 code
+  // 5. 授权确认：PC 授权页是 JS 表单 POST 到 authorize（qlogin_v2.js 的 Q.agree），
+  //    单纯 GET authorize 只会 302 回 show?which=Login，永远拿不到 code。
   const form = new URLSearchParams({
-    client_id: APP_CONFIG.thirdAid,
     response_type: 'code',
+    client_id: APP_CONFIG.thirdAid,
     redirect_uri: redirectUri,
     scope: 'get_user_info,get_app_friends',
-    state: randomUUID().replace(/-/g, '').slice(0, 16),
+    state,
+    switch: '',
+    from_ptlogin: '1',
+    src: '1',
+    update_auth: '1',
+    openapi: '1010_1030',
     g_tk: String(gTk),
+    auth_time: String(Date.now()),
     ui: randomUUID().replace(/-/g, ''),
-    format: 'json',
   });
 
-  let authorized = await net.request(`${APP_CONFIG.graphHost}/oauth2.0/authorize`, {
+  const authorized = await net.request(`${APP_CONFIG.graphHost}/oauth2.0/authorize`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      Referer: `${APP_CONFIG.graphHost}/`,
+      Referer: `${APP_CONFIG.graphHost}/oauth2.0/show?which=Login&display=pc`,
+      'X-Requested-With': 'XMLHttpRequest',
     },
     body: form.toString(),
   });
 
   let location = authorized.headers.get('location') ?? '';
-  if (!location) {
-    // 某些账号会返回一个自动提交的授权确认页，解析表单后继续
-    const html = await authorized.text();
-    const next = extractAutoForm(html);
-    if (next) {
-      authorized = await net.request(next, { method: 'GET' });
-      location = authorized.headers.get('location') ?? '';
-    }
-  }
-
   let code = '';
   for (let hop = 0; hop < 6 && location; hop++) {
     const url = new URL(location, `${APP_CONFIG.graphHost}/`);
@@ -171,6 +192,13 @@ async function completeLogin(net, checkSigUrl) {
     if (!url.hostname.endsWith('qq.com')) break;
     const nextRes = await net.request(url.toString(), { method: 'GET', redirect: 'manual' });
     location = nextRes.headers.get('location') ?? '';
+  }
+  if (!code) {
+    // 少数账号走 JSON 回调：{ ret: 0, callback: "https://...&code=xxx" }
+    const json = parseJsonLoose(await authorized.text());
+    const callback = json?.callback ?? json?.data?.callback ?? '';
+    const fromCallback = new URL(callback || `${APP_CONFIG.graphHost}/`).searchParams.get('code') ?? '';
+    code = fromCallback;
   }
   if (!code) throw new Error('未获取到 OAuth code，请稍后重试');
 
@@ -229,17 +257,6 @@ async function completeLogin(net, checkSigUrl) {
   credentials.vipLevel = account.vipLevel;
 
   return { account, credentials };
-}
-
-function extractAutoForm(html) {
-  const action = html.match(/<form[^>]+action="([^"]+)"/i)?.[1];
-  if (!action) return '';
-  const params = new URLSearchParams();
-  const inputRe = /<input[^>]+name="([^"]+)"[^>]*value="([^"]*)"/gi;
-  let m;
-  while ((m = inputRe.exec(html))) params.set(m[1], m[2]);
-  const base = action.startsWith('http') ? action : `https://graph.qq.com${action}`;
-  return `${base}${base.includes('?') ? '&' : '?'}${params.toString()}`;
 }
 
 /** 用户资料：老 CGI，g_tk = hash33(musickey, 5381)（文档 §3.4） */

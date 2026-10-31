@@ -20,16 +20,22 @@ const APP_ID: &str = "716027609";
 const DAID: &str = "383";
 const THIRD_AID: &str = "100497308";
 const LOGIN_HOST: &str = "https://ssl.ptlogin2.qq.com";
+const XLOGIN_URL: &str = "https://xui.ptlogin2.qq.com/cgi-bin/xlogin";
+const XLOGIN_ORIGIN: &str = "https://xui.ptlogin2.qq.com/";
 const GRAPH_HOST: &str = "https://graph.qq.com";
 const REDIRECT_URI: &str =
     "https://y.qq.com/portal/wx_redirect.html?login_type=1&surl=https%3A%2F%2Fy.qq.com%2F";
 const QR_TTL_MS: i64 = 120 * 1000;
 const QR_KEEP_MS: i64 = 5 * 60 * 1000;
 
-/// ptuiCB('66','0','','0','二维码未失效。', '') —— 参数间可能有空格
+/// ptuiCB('66','0','','0','二维码未失效。', '')
+/// 登录成功时实测返回 7 个参数（第 5 个是文案、第 6 个是昵称），
+/// 因此只取前 3 个必填项 + 可选文案，不要求参数个数与右括号。
 static PTUI: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"ptuiCB\(\s*'([^']*)'\s*,\s*'([^']*)'\s*,\s*'([^']*)'\s*,\s*'([^']*)'\s*,\s*'([^']*)'\s*,\s*'([^']*)'\s*\)")
-        .expect("ptuiCB 正则")
+    Regex::new(
+        r"ptuiCB\(\s*'([^']*)'\s*,\s*'([^']*)'\s*,\s*'([^']*)'(?:\s*,\s*'([^']*)')?(?:\s*,\s*'([^']*)')?",
+    )
+    .expect("ptuiCB 正则")
 });
 
 fn state_by_code(code: &str) -> Option<&'static str> {
@@ -83,8 +89,30 @@ fn login_payload(body: Value, with_tme_login_type: bool) -> Value {
 }
 
 /// 步骤 1：二维码生成（文档 §3.2 步骤 1）
+/// 先走一次 xlogin 拿 `pt_login_sig`：ptqrlogin 要带上它，后续 graph 授权才不会当成陌生设备。
 pub async fn create_qr() -> PResult<QrSession> {
     let net = Net::new();
+    let mut xlogin =
+        Url::parse(XLOGIN_URL).map_err(|error| PlatformError::msg(error.to_string()))?;
+    {
+        let mut query = xlogin.query_pairs_mut();
+        query.append_pair("appid", APP_ID);
+        query.append_pair("daid", DAID);
+        query.append_pair("style", "33");
+        query.append_pair("login_text", "授权并登录");
+        query.append_pair("hide_title_bar", "1");
+        query.append_pair("hide_border", "1");
+        query.append_pair("target", "self");
+        query.append_pair("s_url", &format!("{GRAPH_HOST}/oauth2.0/login_jump"));
+        query.append_pair("pt_3rd_aid", THIRD_AID);
+        query.append_pair(
+            "pt_feedback_link",
+            "https://support.qq.com/products/77942?customInfo=.appid100497308",
+        );
+    }
+    let _ = net.request_with_retry(xlogin.as_str(), "GET", &[], None).await?;
+    let login_sig = net.jar_get("pt_login_sig", XLOGIN_ORIGIN).unwrap_or_default();
+
     let mut url = Url::parse(&format!("{LOGIN_HOST}/ptqrshow"))
         .map_err(|error| PlatformError::msg(error.to_string()))?;
     {
@@ -123,6 +151,7 @@ pub async fn create_qr() -> PResult<QrSession> {
         id: Uuid::new_v4().to_string(),
         net,
         qrsig,
+        login_sig,
         image_data_url: format!("data:image/png;base64,{encoded}"),
         created_at: now_ms(),
         expires_at: now_ms() + QR_TTL_MS,
@@ -176,6 +205,7 @@ async fn poll_session(session: &mut QrSession) -> PResult<Value> {
         query.append_pair("action", &format!("0-0-{}", now_ms()));
         query.append_pair("js_ver", "20102616");
         query.append_pair("js_type", "1");
+        query.append_pair("login_sig", &session.login_sig);
         query.append_pair("pt_uistyle", "40");
         query.append_pair("aid", APP_ID);
         query.append_pair("daid", DAID);
@@ -274,18 +304,25 @@ async fn complete_login(net: &Net, check_url: &str) -> PResult<(Account, Credent
     let g_tk = hash33(&p_skey, 5381);
     let state = Uuid::new_v4().simple().to_string();
     let ui = Uuid::new_v4().simple().to_string();
+
+    // 5. 授权确认：PC 授权页是由 JS 表单 POST 到 authorize（qlogin_v2.js 的 Q.agree），
+    //    只发 GET 会一直 302 回 show?which=Login，永远拿不到 code。
     let form = url::form_urlencoded::Serializer::new(String::new())
-        .append_pair("client_id", THIRD_AID)
         .append_pair("response_type", "code")
+        .append_pair("client_id", THIRD_AID)
         .append_pair("redirect_uri", REDIRECT_URI)
         .append_pair("scope", "get_user_info,get_app_friends")
         .append_pair("state", &state[..16])
+        .append_pair("switch", "")
+        .append_pair("from_ptlogin", "1")
+        .append_pair("src", "1")
+        .append_pair("update_auth", "1")
+        .append_pair("openapi", "1010_1030")
         .append_pair("g_tk", &g_tk.to_string())
+        .append_pair("auth_time", &now_ms().to_string())
         .append_pair("ui", &ui)
-        .append_pair("format", "json")
         .finish();
 
-    // 5. OAuth authorize：拿到 code
     let authorized = net
         .request(
             &format!("{GRAPH_HOST}/oauth2.0/authorize"),
@@ -295,21 +332,17 @@ async fn complete_login(net: &Net, check_url: &str) -> PResult<(Account, Credent
                     "Content-Type".to_string(),
                     "application/x-www-form-urlencoded".to_string(),
                 ),
-                ("Referer".to_string(), format!("{GRAPH_HOST}/")),
+                (
+                    "Referer".to_string(),
+                    format!("{GRAPH_HOST}/oauth2.0/show?which=Login&display=pc"),
+                ),
+                ("X-Requested-With".to_string(), "XMLHttpRequest".to_string()),
             ],
             Some(form),
         )
         .await?;
 
     let mut location = authorized.location.clone().unwrap_or_default();
-    if location.is_empty() {
-        let html = authorized.text();
-        if let Some(next) = extract_auto_form(&html) {
-            let next_response = net.request(&next, "GET", &[], None).await?;
-            location = next_response.location.unwrap_or_default();
-        }
-    }
-
     let mut code = String::new();
     for _ in 0..6 {
         if location.is_empty() {
@@ -335,6 +368,26 @@ async fn complete_login(net: &Net, check_url: &str) -> PResult<(Account, Credent
         }
         let next = net.request(url.as_str(), "GET", &[], None).await?;
         location = next.location.unwrap_or_default();
+    }
+    if code.is_empty() {
+        // 少数账号返回 JSON：{ ret: 0, callback: "https://...&code=xxx" }
+        let json = authorized.json_loose();
+        let callback = json
+            .get("callback")
+            .and_then(Value::as_str)
+            .or_else(|| {
+                json.get("data")
+                    .and_then(|data| data.get("callback"))
+                    .and_then(Value::as_str)
+            })
+            .unwrap_or("");
+        if let Ok(url) = Url::parse(callback) {
+            code = url
+                .query_pairs()
+                .find(|(key, _)| key == "code")
+                .map(|(_, value)| value.to_string())
+                .unwrap_or_default();
+        }
     }
     if code.is_empty() {
         return Err(PlatformError::msg("未获取到 OAuth code，请稍后重试"));
@@ -431,30 +484,6 @@ async fn complete_login(net: &Net, check_url: &str) -> PResult<(Account, Credent
     credentials.encrypt_uin = account.encrypt_uin.clone();
 
     Ok((account, credentials))
-}
-
-fn extract_auto_form(html: &str) -> Option<String> {
-    static ACTION: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r#"(?i)<form[^>]+action="([^"]+)""#).expect("form action 正则")
-    });
-    static INPUT: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r#"(?i)<input[^>]+name="([^"]+)"[^>]*value="([^"]*)""#).expect("form input 正则")
-    });
-
-    let action = ACTION.captures(html)?.get(1)?.as_str();
-    let mut params = url::form_urlencoded::Serializer::new(String::new());
-    for captures in INPUT.captures_iter(html) {
-        if let (Some(name), Some(value)) = (captures.get(1), captures.get(2)) {
-            params.append_pair(name.as_str(), value.as_str());
-        }
-    }
-    let base = if action.starts_with("http") {
-        action.to_string()
-    } else {
-        format!("{GRAPH_HOST}{action}")
-    };
-    let separator = if base.contains('?') { '&' } else { '?' };
-    Some(format!("{base}{separator}{}", params.finish()))
 }
 
 /// 用户资料：老 CGI，g_tk = hash33(musickey, 5381)（文档 §3.4）
@@ -725,14 +754,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parses_auto_form() {
-        let html = r#"<form action="/oauth2.0/authorize" method="post">
-            <input type="hidden" name="client_id" value="100497308" />
-            <input type="hidden" name="response_type" value="code" />
-        </form>"#;
-        let url = extract_auto_form(html).expect("表单");
-        assert!(url.starts_with("https://graph.qq.com/oauth2.0/authorize?"));
-        assert!(url.contains("client_id=100497308"));
+    fn parses_success_line_with_seven_args() {
+        // 实测：手机确认后返回 7 个参数，第 5 个是文案、第 6 个是昵称
+        let text = "ptuiCB('0','0','https://ssl.ptlogin2.graph.qq.com/check_sig?pttype=1&uin=123','0','登录成功！', '小Q', '')";
+        let captures = PTUI.captures(text).expect("ptuiCB");
+        assert_eq!(captures.get(1).unwrap().as_str(), "0");
+        assert!(captures
+            .get(3)
+            .unwrap()
+            .as_str()
+            .starts_with("https://ssl.ptlogin2.graph.qq.com/check_sig"));
+        assert_eq!(captures.get(5).unwrap().as_str(), "登录成功！");
     }
 
     #[test]

@@ -21,6 +21,8 @@ pub struct QrSession {
     pub id: String,
     pub net: Net,
     pub qrsig: String,
+    /// xlogin 下发的 pt_login_sig，ptqrlogin 必须带上
+    pub login_sig: String,
     pub image_data_url: String,
     pub created_at: i64,
     pub expires_at: i64,
