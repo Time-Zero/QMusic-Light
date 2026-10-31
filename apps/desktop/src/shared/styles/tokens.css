@@ -111,6 +111,7 @@
    *  P3      页面与内容   --dur-page / --dur-card     320 / 260ms   --ease-out     路由切换、首批数据落地；级联 24–32ms
    *  P4      环境动效     0.9–1.6s infinite           linear /      —              频谱、骨架微光、加载指示；窗口失焦即暂停
    *  例外    布局折叠     --dur-base                  200ms         --ease-move    侧栏宽度（唯一的布局型过渡）
+   *          配合标签     --dur-rail-out / --dur-rail-in  120 / 120ms  --ease-out     侧栏文字，入场晚 --rail-in-delay(60ms)
    *
    * 优先级即顺序：P0 永远不被 P1–P3 延迟；P3 只在挂载时播放一次，不随数据更新重放。
    * 位移只用 transform，透明度只用 opacity；不使用 width/height/top/left 做过渡（侧栏折叠是唯一例外，见 layout.css）。
@@ -128,6 +129,19 @@
   --dur-card: 260ms;
   --dur-page: 320ms;
   --dur-slow: var(--dur-page); /* 旧名，等同页面入场 */
+
+  /*
+   * 侧栏折叠的配角节奏：宽度走 200ms（--dur-base / --ease-move），文字必须先退后进。
+   * 淡出用 --ease-out，前一帧就掉到 0.15 以下，因此在栏宽收窄到文字边缘之前已经看不见，
+   * 不会留下被硬切的省略号。
+   * 淡入的延迟以实测宽度为准，不是凭感觉：--ease-move 起手很慢，
+   * 60ms 时栏宽只有约 100px，100ms 约 178px，120ms 才到 200px 左右。
+   * 品牌 + 搜索提示 + Ctrl K 需要约 190px 才排得下，所以等到 120ms 再淡入，
+   * 否则会先看见"搜索歌曲、歌…"这种被压扁的中间态。
+   */
+  --dur-rail-out: 120ms;
+  --dur-rail-in: 100ms;
+  --rail-in-delay: 120ms;
 
   --stagger: 32ms;
   --stagger-card: 24ms;

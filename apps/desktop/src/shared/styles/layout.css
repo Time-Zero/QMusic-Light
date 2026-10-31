@@ -6,6 +6,8 @@
   /*
    * 全站唯一的布局型过渡：由用户点击触发、频次极低，200ms 内可以接受。
    * 内容区用 contain 隔离重排传播，避免侧栏收缩时把整页布局信息冒泡到根节点。
+   * 栏宽与栏内图标的内边距共用 --dur-base / --ease-move，两者的中间帧必须落在同一条曲线上，
+   * 否则图标会在动画中途相对栏边滑动。
    */
   transition: grid-template-columns var(--dur-base) var(--ease-move);
 }
@@ -20,8 +22,18 @@
   flex-direction: column;
   gap: 6px;
   min-height: 0;
+  min-width: 0;
   padding: var(--sp-4) var(--sp-3) var(--sp-2);
   border-right: 1px solid var(--rule);
+  /*
+   * 折叠只裁不挤：标签在折叠态仍然按展开时的字宽/行高排布，超出图标栏的部分在这里被切掉。
+   * 于是 200ms 的宽度动画期间，文字不会因为容器变窄而重新折行、重算省略号、把图标顶歪
+   * ——"展开时文字跳变"就是这些逐帧重排造成的。裁剪同时把自动最小尺寸压成 0，
+   * 64px 的轨道不会被栏内内容撑开。
+   */
+  overflow: hidden;
+  /* 图标栏的内宽（扣掉两侧内边距与右侧分隔线），折叠态据此把图标精确居中 */
+  --rail-inner: calc(var(--sidebar-w-min) - 2 * var(--sp-3) - 1px);
 }
 
 .brand {
@@ -30,6 +42,19 @@
   gap: 10px;
   padding: 2px var(--sp-2) var(--sp-4);
   min-width: 0;
+  transition: padding-inline var(--dur-base) var(--ease-move);
+}
+
+/*
+ * 品牌文字层：可收缩、超出即裁剪，折叠过程中既不改行高也不换行。
+ * 这里的 white-space: nowrap 不能省：.brand-name / .brand-sub 各自 nowrap 只保证自己不折行，
+ * 两个行内 span 之间仍然有换行机会，栏宽一收窄第二个就会掉到下一行，把 .brand 从 1 行撑成 2 行，
+ * 下方的搜索框和整个导航会在某一帧整体下移——这才是折叠/展开时看到的"跳位"。
+ */
+.brand-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .brand-mark {
@@ -85,10 +110,13 @@
     0 0 0 1px var(--shade-1),
     0 10px 20px -16px var(--shade-2),
     inset 0 1px 0 var(--hi);
+  overflow: hidden;
   color: var(--text-tertiary);
   font-size: var(--fs-xs);
   text-align: left;
-  transition: box-shadow var(--dur-fast) var(--ease-out);
+  transition:
+    box-shadow var(--dur-fast) var(--ease-out),
+    padding-inline var(--dur-base) var(--ease-move);
 }
 
 .search-trigger:hover {
@@ -105,13 +133,24 @@
 }
 
 .search-trigger kbd {
+  flex: none;
   margin-left: auto;
+  /* 两段式标签（"Ctrl K"）在窄栏里会被压成两行，撑出一个两倍高的白块 */
+  white-space: nowrap;
   padding: 1px 5px;
   border-radius: 5px;
   box-shadow: inset 0 0 0 1px var(--rule);
   font-family: inherit;
   font-size: 10px;
   color: var(--text-tertiary);
+}
+
+/* 收缩到图标栏时只剩一个圆，提示文字单行截断即可，不许换行抬高 pill */
+.search-trigger span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .nav {
@@ -136,7 +175,15 @@
   white-space: nowrap;
   transition:
     background var(--dur-fast) var(--ease-out),
-    color var(--dur-fast) var(--ease-out);
+    color var(--dur-fast) var(--ease-out),
+    padding-inline var(--dur-base) var(--ease-move);
+}
+
+/* 与 .pl-item span 保持同一套截断规则：折叠/展开两态都单行省略，永不折行（徽标除外） */
+.nav-item > span:not(.nav-badge) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .nav-item svg {
@@ -192,11 +239,15 @@
   font-size: var(--fs-xs);
   font-weight: 400;
   color: var(--text-tertiary);
+  /* 分组标题是裸文本节点，栏宽变化时不许折行（折行会撑高、把下面的列表整体推下去） */
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .side-label button {
   display: grid;
   place-items: center;
+  flex: none;
   width: 24px;
   height: 24px;
   margin-left: auto;
@@ -269,6 +320,7 @@
   margin-top: auto;
   padding: var(--sp-3) var(--sp-2) 2px;
   border-top: 1px solid var(--rule);
+  transition: padding-inline var(--dur-base) var(--ease-move);
 }
 
 .avatar {
@@ -323,41 +375,73 @@
     color var(--dur-fast) var(--ease-out);
 }
 
+/*
+ * 齿轮自带悬停过渡，与 .fade-label 的 transition 简写同级、且它的规则更靠后，
+ * 所以在这里用更具体的选择器把悬停与淡入两组合并，别处不要再给它写 transition。
+ */
+.account .gear.fade-label {
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    opacity var(--dur-rail-in) var(--ease-out) var(--rail-in-delay),
+    visibility 0s linear var(--rail-in-delay);
+}
+
 .account .gear:hover {
   background: var(--surface);
   color: var(--text);
 }
 
-.app[data-collapsed='true'] .brand-name,
-.app[data-collapsed='true'] .brand-sub,
-.app[data-collapsed='true'] .search-trigger span,
-.app[data-collapsed='true'] .search-trigger kbd,
-.app[data-collapsed='true'] .nav-item span,
-.app[data-collapsed='true'] .side-label,
-.app[data-collapsed='true'] .side-scroll,
-.app[data-collapsed='true'] .account .who,
-.app[data-collapsed='true'] .account .vip,
+/*
+ * 标签显隐：折叠态不再用 display:none。display 是不可过渡的，切换那一帧文字会瞬间消失、
+ * 整列元素立刻按 64px 重排，而栏宽还要再走 200ms——"展开时文本跳变/错位"就出在这里。
+ * 改成 opacity + 延迟的 visibility，并把两段节奏错开栏宽过渡：
+ *   收起：120ms 内退干净（--ease-out 前 40ms 就掉到 0.15 以下），赶在栏宽收窄到文字边缘之前；
+ *   展开：先等 120ms（实测栏宽此时约 200px，够放下品牌名 + 搜索提示 + Ctrl K）再淡入，
+ *        100ms 淡完，收尾时文字已经就位。
+ * visibility 用 0s 过渡挂延迟，保证淡完之后才移出可访问性树与命中测试（栏内仍可点图标）。
+ */
+.sidebar .fade-label {
+  transition:
+    opacity var(--dur-rail-in) var(--ease-out) var(--rail-in-delay),
+    visibility 0s linear var(--rail-in-delay);
+}
+
+.app[data-collapsed='true'] .fade-label {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--dur-rail-out) var(--ease-out),
+    visibility 0s linear var(--dur-rail-out);
+}
+
+/* 齿轮在折叠态同样淡出，悬停过渡让位给淡出通道（此时它不可见，也无需悬停反馈） */
 .app[data-collapsed='true'] .account .gear {
-  display: none;
+  transition:
+    opacity var(--dur-rail-out) var(--ease-out),
+    visibility 0s linear var(--dur-rail-out);
 }
 
+/*
+ * 折叠态的几何：不切 justify-content（那是离散值，切的那一帧图标就跳位了），
+ * 改为把内边距过渡到"图标在 --rail-inner 里居中"的值，并与栏宽共用同一条缓动。
+ * 图标因此在整段动画里连续滑动，落点正好在 64px 栏的中线上。
+ * 括号里的常数就是各行的图标宽度：.brand-mark 26 / 搜索图标 15（另有左右 2px margin）/ .nav-item 图标 17 / .avatar 28。
+ */
 .app[data-collapsed='true'] .brand {
-  justify-content: center;
-  padding-inline: 0;
+  padding-inline: calc((var(--rail-inner) - 26px) / 2);
 }
 
-.app[data-collapsed='true'] .search-trigger,
+.app[data-collapsed='true'] .search-trigger {
+  padding-inline: calc((var(--rail-inner) - 4px - 15px) / 2);
+}
+
 .app[data-collapsed='true'] .nav-item {
-  justify-content: center;
-  padding: 0;
+  padding-inline: calc((var(--rail-inner) - 17px) / 2);
 }
 
 .app[data-collapsed='true'] .account {
-  justify-content: center;
-}
-
-.app[data-collapsed='true'] .nav-badge {
-  display: none;
+  padding-inline: calc((var(--rail-inner) - 28px) / 2);
 }
 
 /* ---------------------------- workspace ---------------------------- */
@@ -497,29 +581,29 @@
     grid-template-columns: var(--sidebar-w-min) minmax(0, 1fr);
   }
 
-  .app .brand-name,
-  .app .brand-sub,
-  .app .search-trigger span,
-  .app .search-trigger kbd,
-  .app .nav-item span,
-  .app .side-label,
-  .app .side-scroll,
-  .app .account .who,
-  .app .account .vip,
-  .app .account .gear {
-    display: none;
+  /*
+   * 窄窗恒为图标栏，与 [data-collapsed='true'] 同一套：标签淡出（这里只需目标值，
+   * 过渡沿用 .fade-label 的入场节奏）+ 图标居中。改这几行时要和上面的折叠态一起改。
+   */
+  .app .fade-label {
+    opacity: 0;
+    visibility: hidden;
   }
 
-  .app .brand,
-  .app .search-trigger,
-  .app .nav-item,
+  .app .brand {
+    padding-inline: calc((var(--rail-inner) - 26px) / 2);
+  }
+
+  .app .search-trigger {
+    padding-inline: calc((var(--rail-inner) - 4px - 15px) / 2);
+  }
+
+  .app .nav-item {
+    padding-inline: calc((var(--rail-inner) - 17px) / 2);
+  }
+
   .app .account {
-    justify-content: center;
-    padding-inline: 0;
-  }
-
-  .app .nav-badge {
-    display: none;
+    padding-inline: calc((var(--rail-inner) - 28px) / 2);
   }
 
   .top-actions .pill {

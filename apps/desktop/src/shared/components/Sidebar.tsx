@@ -47,35 +47,46 @@ export function Sidebar() {
             <path d="M9 18.5a3.5 3.5 0 1 1-2-3.16V6l11-2v9.5a3.5 3.5 0 1 1-2-3.16V6.6L9 8.1v10.4Z" />
           </svg>
         </span>
-        <span>
+        <span className="brand-text fade-label">
           <span className="brand-name">QQ 音乐</span>
           <span className="brand-sub">Lite · 本地版</span>
         </span>
       </Link>
 
-      <button type="button" className="search-trigger" onClick={() => navigate('/search')}>
+      <button
+        type="button"
+        className="search-trigger"
+        aria-label="搜索歌曲、歌单"
+        onClick={() => navigate('/search')}
+      >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
           <circle cx="11" cy="11" r="6.5" />
           <path d="m16 16 4 4" />
         </svg>
-        <span>搜索歌曲、歌单</span>
-        <kbd>Ctrl K</kbd>
+        <span className="fade-label">搜索歌曲、歌单</span>
+        <kbd className="fade-label">Ctrl K</kbd>
       </button>
 
       <nav className="nav">
         {navItems.map((item) => {
           const Icon = item.icon;
           return (
-            <Link key={item.to} to={item.to} className={cn('nav-item', isActive(item.to) && 'active')}>
+            <Link
+              key={item.to}
+              to={item.to}
+              className={cn('nav-item', isActive(item.to) && 'active')}
+              aria-label={item.title}
+            >
               <Icon />
-              <span>{item.title}</span>
-              {item.badge ? <span className="nav-badge">{item.badge}</span> : null}
+              <span className="fade-label">{item.title}</span>
+              {item.badge ? <span className="nav-badge fade-label">{item.badge}</span> : null}
             </Link>
           );
         })}
       </nav>
 
-      <div className="side-scroll">
+      {/* fade-label：折叠时整块淡出（不 display:none，否则栏宽动画期间列表会瞬间消失又瞬间长出） */}
+      <div className="side-scroll fade-label">
         <div className="side-label">
           我的歌单
           <button
@@ -87,7 +98,12 @@ export function Sidebar() {
           </button>
         </div>
         {!account ? (
-          <button type="button" className="pl-item" onClick={() => navigate('/login')}>
+          <button
+            type="button"
+            className="pl-item"
+            aria-label="登录后同步你的歌单"
+            onClick={() => navigate('/login')}
+          >
             <i className="dot">
               <Music4 size={12} color="#cfd4dc" />
             </i>
@@ -103,6 +119,7 @@ export function Sidebar() {
                 location.pathname === `/playlist/${playlist.id}` && 'active',
               )}
               style={coverVars(playlist.id)}
+              aria-label={playlist.title}
             >
               <i className="dot" />
               <span title={playlist.title}>{playlist.title}</span>
@@ -126,6 +143,7 @@ export function Sidebar() {
                 location.pathname === `/playlist/${playlist.id}` && 'active',
               )}
               style={coverVars(playlist.id)}
+              aria-label={playlist.title}
             >
               <i className="dot" />
               <span title={playlist.title}>{playlist.title}</span>
@@ -146,13 +164,14 @@ export function Sidebar() {
               {account.avatar ? <img src={account.avatar} alt="" /> : initials(account.nickname)}
             </span>
             <span style={{ minWidth: 0 }}>
-              <span className="who ellipsis">{account.nickname}</span>
-              <span className="vip ellipsis">{account.vipLabel || `QQ ${account.uin}`}</span>
+              <span className="who ellipsis fade-label">{account.nickname}</span>
+              <span className="vip ellipsis fade-label">{account.vipLabel || `QQ ${account.uin}`}</span>
             </span>
             <button
               type="button"
-              className="gear"
+              className="gear fade-label"
               title="设置"
+              aria-label="设置"
               onClick={() => navigate('/settings')}
             >
               <Settings size={16} />
@@ -162,13 +181,14 @@ export function Sidebar() {
           <>
             <span className="avatar">?</span>
             <span style={{ minWidth: 0 }}>
-              <span className="who ellipsis">未登录</span>
-              <span className="vip ellipsis">先逛，再登录</span>
+              <span className="who ellipsis fade-label">未登录</span>
+              <span className="vip ellipsis fade-label">先逛，再登录</span>
             </span>
             <button
               type="button"
-              className="gear"
+              className="gear fade-label"
               title="扫码登录"
+              aria-label="扫码登录"
               onClick={() => navigate('/login')}
             >
               <LogIn size={16} />
