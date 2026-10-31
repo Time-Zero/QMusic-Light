@@ -204,6 +204,28 @@ describe('推荐流映射', () => {
     expect(sections[1].cards[0].type).toBe('function');
   });
 
+  it('功能入口卡的封面支持对象形态', () => {
+    const sections = mapFeed({
+      v_shelf: [
+        {
+          v_niche: [
+            {
+              v_card: [
+                {
+                  type: 700,
+                  id: '99',
+                  title: '猜你喜欢',
+                  cover: { default_url: 'http://qpic.y.qq.com/radio/600?n=1' },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    expect(sections[0].cards[0].cover).toBe('https://qpic.y.qq.com/radio/600?n=1');
+  });
+
   it('能从推荐流里找到每日 30 首的 disstid', () => {
     expect(findDailyPlaylistId(feed)).toBe(0);
 

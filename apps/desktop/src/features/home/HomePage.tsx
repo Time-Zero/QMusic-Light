@@ -24,6 +24,27 @@ import { CardGridSkeleton, TracksSkeleton } from '@/shared/ui/Skeleton';
 import { TrackTable } from '@/shared/ui/TrackTable';
 import { toast, useUiStore } from '@/shared/ui/ui-store';
 
+/** 推荐流里的功能入口卡没有歌单 id，按标题/id 映射到站内能力 */
+const isRadioCard = (card: FeedCard) => card.id === '99' || card.title.includes('猜你喜欢');
+const isRadarCard = (card: FeedCard) => card.id === '22000' || card.title.includes('雷达模式');
+const isDailyCard = (card: FeedCard) => /每日\s*30\s*首/.test(card.title);
+
+/** 只保留站内已实现的卡片；星光农场/快听/签到等活动入口没有对应接口，直接不下发到界面 */
+const isSupportedCard = (card: FeedCard) =>
+  card.type === 'song' ||
+  card.type === 'playlist' ||
+  isRadioCard(card) ||
+  isRadarCard(card) ||
+  isDailyCard(card);
+
+/** 功能入口卡上游不给封面，用图标兜底 */
+const feedCardGlyph = (card: FeedCard) => {
+  if (isRadioCard(card)) return '♥';
+  if (isRadarCard(card)) return '◉';
+  if (isDailyCard(card)) return '30';
+  return undefined;
+};
+
 export default function HomePage() {
   const core = useCore();
   const navigate = useNavigate();
@@ -96,10 +117,6 @@ export default function HomePage() {
     }
   };
 
-  /** 推荐流里的功能入口卡没有歌单 id，按标题/id 映射到站内能力 */
-  const isRadioCard = (card: FeedCard) => card.id === '99' || card.title.includes('猜你喜欢');
-  const isRadarCard = (card: FeedCard) => card.id === '22000' || card.title.includes('雷达模式');
-
   const playGenerated = async (
     kind: 'radio' | 'radar',
     load: () => Promise<Song[]>,
@@ -145,11 +162,10 @@ export default function HomePage() {
       void playRadar();
       return;
     }
-    if (/每日\s*30\s*首/.test(card.title)) {
+    if (isDailyCard(card)) {
       navigate('/daily');
       return;
     }
-    toast(`「${card.title}」当前版本暂未支持`);
   };
 
   const playCard = (card: FeedCard) => {
@@ -166,14 +182,18 @@ export default function HomePage() {
   const playingMid = usePlayerStore((s) => (s.index >= 0 ? s.queue[s.index]?.mid : undefined));
   const playing = usePlayerStore((s) => s.playing);
 
-  const feedSection = feed.data?.[0];
+  // 首个仍有可展示卡片的货架，避免整架都是活动入口时标题/副标题对不上内容
+  const feedSection = useMemo(
+    () => (feed.data ?? []).find((section) => section.cards.some(isSupportedCard)),
+    [feed.data],
+  );
   const feedCards = useMemo(() => {
     const seen = new Set<string>();
     const cards: FeedCard[] = [];
     for (const section of feed.data ?? []) {
       for (const card of section.cards) {
-        // 「快听」是 App 内竖屏短视频片段流（openQuickListenSubPage），没有可调用的 CGI，站内无法还原
-        if (card.id === '22001' || card.title === '快听') continue;
+        // 星光农场、快听、签到等入口没有对应 CGI，站内无法还原，直接过滤掉
+        if (!isSupportedCard(card)) continue;
         const key = `${card.type}-${card.id}`;
         if (seen.has(key)) continue;
         seen.add(key);
@@ -197,6 +217,19 @@ export default function HomePage() {
     }
     return cards;
   }, [feed.data, square.data]);
+
+  // 猜你喜欢是功能入口卡，上游不返回封面；用个性电台首曲的专辑封面补上
+  const needsRadioCover = feedCards.some((card) => isRadioCard(card) && !card.cover);
+  const radioCover = useQuery({
+    queryKey: ['radio-cover', account?.uin ?? 'guest'],
+    queryFn: async () => (await core.feed.radio(1))[0]?.cover ?? '',
+    enabled: Boolean(account) && needsRadioCover,
+    staleTime: TTL.feed,
+    retry: 0,
+  });
+
+  const cardCover = (card: FeedCard) =>
+    card.cover || (isRadioCard(card) ? (radioCover.data ?? '') : '');
 
   return (
     <div>
@@ -341,7 +374,8 @@ export default function HomePage() {
                 key={`${card.type}-${card.id}-${index}`}
                 title={card.title}
                 subtitle={card.subtitle || (card.type === 'playlist' ? '歌单' : '歌曲')}
-                cover={card.cover}
+                cover={cardCover(card)}
+                glyph={feedCardGlyph(card)}
                 seed={card.playlistId ?? card.id}
                 rank={index + 1}
                 onOpen={() => openCard(card)}

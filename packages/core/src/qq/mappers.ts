@@ -235,7 +235,11 @@ function toFeedCard(rawInput: unknown): FeedCard | null {
   const subtitle = decodeEntities(
     str(misc.cnt_content, raw.subtitle, misc.rcmdtemplate, raw.rcmdcontent, asObj(raw.singer).name),
   );
-  const cover = playlistCoverUrl(str(raw.cover, asObj(raw.cover).default_url, raw.picurl));
+  // 封面可能是字符串，也可能是 { default_url, big_url, small_url } 对象（功能入口卡常见）
+  const coverObj = asObj(raw.cover);
+  const cover = playlistCoverUrl(
+    str(coverObj.default_url, coverObj.big_url, coverObj.small_url, raw.cover, raw.picurl, raw.picUrl, raw.logo),
+  );
 
   if (type === 200) {
     const song = toSong(raw.song ?? raw.track ?? raw);
@@ -243,14 +247,18 @@ function toFeedCard(rawInput: unknown): FeedCard | null {
     return { type: 'song', id: song.mid, title: song.name, subtitle, cover: song.cover || cover, song };
   }
   if (type === 500) {
-    const playlistId = num(raw.id, raw.tid, asObj(raw.basic).tid);
+    const basic = asObj(raw.basic);
+    const basicCover = asObj(basic.cover);
+    const playlistId = num(raw.id, raw.tid, basic.tid);
     if (!playlistId) return null;
     return {
       type: 'playlist',
       id: String(playlistId),
       title,
       subtitle,
-      cover: cover || playlistCoverUrl(str(asObj(raw.basic).cover)),
+      cover:
+        cover ||
+        playlistCoverUrl(str(basicCover.default_url, basicCover.big_url, basicCover.small_url, basic.cover, basic.picurl)),
       playlistId,
     };
   }
