@@ -5,12 +5,15 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { attachProgressDriver } from '@/shared/lib/progress-driver';
 import { toast } from '@/shared/ui/ui-store';
+import { localSrc, prefetchTrack, preparePlaybackSrc } from './stream-cache';
 
 let core: Core | null = null;
 let audio: HTMLAudioElement | null = null;
 let audioBound = false;
 let retried = false;
 let failures = 0;
+/** 播放请求序号：预取会让 playAt 多等一会儿，期间若已切歌就丢弃旧请求 */
+let playToken = 0;
 
 const RNG = Math.random;
 
@@ -97,14 +100,20 @@ export const usePlayerStore = create<PlayerState>()(
         }
 
         const el = ensureAudio();
+        const token = ++playToken;
         set({ index, loading: true, playing: false, currentTime: 0, error: undefined });
 
         try {
           const info = await instance.stream.resolve(song);
+          if (token !== playToken) return;
+          // 命中缓存就是本地回放；未命中时抢一段预取窗口，赶不上再回落直链
+          const src = await preparePlaybackSrc(song, info);
+          if (token !== playToken) return;
           retried = false;
-          el.src = info.url;
+          el.src = src;
           el.currentTime = 0;
           await el.play();
+          if (token !== playToken) return;
           set({
             playing: true,
             loading: false,
@@ -114,7 +123,9 @@ export const usePlayerStore = create<PlayerState>()(
           failures = 0;
           void instance.repo.addHistory(song).catch(() => undefined);
           updateMediaSession(song);
+          preloadNext();
         } catch (error) {
+          if (token !== playToken) return;
           const message = error instanceof Error ? error.message : '播放失败';
           failures += 1;
           set({ loading: false, playing: false, error: message });
@@ -303,14 +314,38 @@ function bindAudioEvents(el: HTMLAudioElement) {
     const song = state.queue[state.index];
     if (!song || !el.src) return;
     if (!retried) {
-      // 直链有时效，403 时静默重取一次（文档 §3.5）
+      // 直链有时效，403 时静默重取一次（文档 §3.5）；若整首已缓存则改读本地
       retried = true;
-      core?.stream.invalidate(song);
-      void state.playAt(state.index, true);
+      void (async () => {
+        const quality = state.streamQuality;
+        const cached = quality ? await localSrc(song, quality) : null;
+        if (cached && cached !== el.src) {
+          el.src = cached;
+          try {
+            await el.play();
+            return;
+          } catch {
+            // 本地也不可用，继续走重新解析
+          }
+        }
+        core?.stream.invalidate(song);
+        void state.playAt(state.index, true);
+      })();
       return;
     }
     usePlayerStore.setState({ playing: false, loading: false, error: '音频加载失败' });
   });
+}
+
+/** 起播后立刻预取下一首，切歌时直接从本地读 */
+function preloadNext() {
+  const state = usePlayerStore.getState();
+  const instance = core;
+  if (!instance || state.queue.length < 2) return;
+  const target = nextIndex(state.mode, state.index, state.queue.length, RNG);
+  const song = state.queue[target];
+  if (!song || target === state.index) return;
+  void prefetchTrack(instance, song).catch(() => undefined);
 }
 
 function updateMediaSession(song: Song) {

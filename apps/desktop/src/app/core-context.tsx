@@ -47,6 +47,14 @@ export function CoreProvider({ children }: { children: ReactNode }) {
           .then((info) => alive && setSys(info))
           .catch(() => undefined);
 
+        // 窗口/托盘/缓存偏好的真源在平台层，启动时回灌到设置 store
+        void bridge.settings
+          .get()
+          .then((value) => {
+            if (alive) useSettingsStore.getState().hydrateShell(value);
+          })
+          .catch(() => undefined);
+
         const restored = await bridge.auth.restore();
         if (!alive) return;
 

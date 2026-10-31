@@ -49,3 +49,18 @@ export function initials(name: string): string {
 export function groupLabel(count: number, unit = '首'): string {
   return `${count} ${unit}`;
 }
+
+/** 缓存占用：1.2 GB / 640 MB / 512 B */
+export function formatBytes(bytes: number): string {
+  const value = Math.max(0, bytes || 0);
+  if (value < 1024) return `${Math.round(value)} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let size = value / 1024;
+  let index = 0;
+  while (size >= 1024 && index < units.length - 1) {
+    size /= 1024;
+    index += 1;
+  }
+  const text = size >= 10 ? size.toFixed(0) : size.toFixed(1).replace(/\.0$/, '');
+  return `${text} ${units[index]}`;
+}

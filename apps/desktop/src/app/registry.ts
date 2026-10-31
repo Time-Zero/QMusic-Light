@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { CalendarDays, Compass, Heart, History, LibraryBig } from 'lucide-react';
+import { CalendarDays, Compass, Heart, History, LibraryBig, Settings } from 'lucide-react';
 import type { RouteObject } from 'react-router-dom';
 
 export interface NavItem {
@@ -57,6 +57,8 @@ export const features: FeatureModule[] = [
   },
   {
     id: 'settings',
+    // 侧栏常驻入口：账号行的齿轮只在登录后出现，未登录也必须能进设置
+    nav: { to: '/settings', title: '设置', icon: Settings, order: 99 },
     routes: [{ path: 'settings', lazy: page(() => import('@/features/settings/SettingsPage')) }],
   },
   {

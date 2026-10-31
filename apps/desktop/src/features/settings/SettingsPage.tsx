@@ -2,11 +2,14 @@ import { QUALITY_LABEL } from '@qmusic/shared-types';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Database,
+  FolderOpen,
+  HardDriveDownload,
   Info,
   LogIn,
   LogOut,
   MonitorCog,
   Palette,
+  Power,
   SlidersHorizontal,
   TriangleAlert,
   UserRound,
@@ -14,12 +17,12 @@ import {
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCore, useSysInfo } from '@/app/core-context';
-import { QUALITY_OPTIONS, useSettingsStore } from '@/app/settings-store';
-import { bridge } from '@/bridge';
+import { CACHE_LIMIT_OPTIONS, QUALITY_OPTIONS, useSettingsStore } from '@/app/settings-store';
+import { bridge, IS_TAURI } from '@/bridge';
 import { useAccount, useSessionStore } from '@/features/auth/session-store';
 import { usePlayerStore } from '@/features/player/player-store';
 import { cn } from '@/shared/lib/cn';
-import { formatDateCN, initials } from '@/shared/lib/format';
+import { formatBytes, formatDateCN, initials } from '@/shared/lib/format';
 import { toast, useUiStore } from '@/shared/ui/ui-store';
 
 export default function SettingsPage() {
@@ -38,12 +41,30 @@ export default function SettingsPage() {
   const collapsed = useSettingsStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useSettingsStore((s) => s.toggleSidebar);
 
+  const streamCache = useSettingsStore((s) => s.streamCache);
+  const cacheDir = useSettingsStore((s) => s.cacheDir);
+  const defaultCacheDir = useSettingsStore((s) => s.defaultCacheDir);
+  const cacheMaxBytes = useSettingsStore((s) => s.cacheMaxBytes);
+  const cacheUsedBytes = useSettingsStore((s) => s.cacheUsedBytes);
+  const cacheFileCount = useSettingsStore((s) => s.cacheFileCount);
+  const closeAction = useSettingsStore((s) => s.closeAction);
+  const minimizeToTray = useSettingsStore((s) => s.minimizeToTray);
+  const updatePrefs = useSettingsStore((s) => s.updatePrefs);
+  const refreshCacheStats = useSettingsStore((s) => s.refreshCacheStats);
+  const clearStreamCache = useSettingsStore((s) => s.clearStreamCache);
+
   const [busy, setBusy] = useState<string | null>(null);
+  const [editingDir, setEditingDir] = useState(false);
+  const [dirDraft, setDirDraft] = useState('');
 
   useEffect(() => {
     setCrumb('设置');
     document.title = '设置 · QQ 音乐 Lite';
   }, [setCrumb]);
+
+  useEffect(() => {
+    void refreshCacheStats();
+  }, [refreshCacheStats]);
 
   const logout = async () => {
     setBusy('logout');
@@ -90,6 +111,66 @@ export default function SettingsPage() {
       await core.repo.clearLocalData();
       queryClient.clear();
       toast('本地数据已全部清除', 'success');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const saveCacheDir = async () => {
+    const value = dirDraft.trim();
+    if (!value) {
+      toast('请填写一个可写的目录路径', 'error');
+      return;
+    }
+    setBusy('cache-dir');
+    try {
+      await updatePrefs({ cacheDir: value });
+      setEditingDir(false);
+      toast('缓存目录已切换', 'success');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** 原生文件夹选择器：选完直接生效，不用再点「使用」 */
+  const browseCacheDir = async () => {
+    if (!IS_TAURI) {
+      toast('浏览器预览不支持原生目录选择，请用桌面版', 'error');
+      return;
+    }
+    setBusy('cache-dir');
+    try {
+      const { path } = await bridge.settings.pickDir();
+      if (!path) return; // 用户取消了
+      const next = await bridge.settings.update({ cacheDir: path });
+      useSettingsStore.getState().hydrateShell(next);
+      setDirDraft(path);
+      setEditingDir(false);
+      toast('缓存目录已切换', 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : '无法打开文件夹选择器', 'error');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const resetCacheDir = async () => {
+    setBusy('cache-dir');
+    try {
+      await updatePrefs({ cacheDir: '' });
+      toast('已恢复默认缓存目录', 'success');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const clearStream = async () => {
+    setBusy('stream-cache');
+    try {
+      await clearStreamCache();
+      toast('播放缓存已清空', 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : '清空失败', 'error');
     } finally {
       setBusy(null);
     }
@@ -258,6 +339,185 @@ export default function SettingsPage() {
 
         <section className="setting-card">
           <h3>
+            <HardDriveDownload />
+            播放缓存
+          </h3>
+          <div className="setting-row" style={{ marginTop: 8 }}>
+            <span className="label">提前缓存</span>
+            <div className="seg">
+              <button
+                type="button"
+                className={cn(streamCache && 'active')}
+                onClick={() => void updatePrefs({ streamCache: true })}
+              >
+                开启
+              </button>
+              <button
+                type="button"
+                className={cn(!streamCache && 'active')}
+                onClick={() => void updatePrefs({ streamCache: false })}
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+          <div className="setting-row">
+            <span className="label">上限</span>
+            <div className="seg">
+              {CACHE_LIMIT_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={cn(cacheMaxBytes === option.value && 'active')}
+                  onClick={() => void updatePrefs({ cacheMaxBytes: option.value })}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="setting-row">
+            <span className="label">缓存目录</span>
+            <span className="value setting-path" title={cacheDir || defaultCacheDir}>
+              {cacheDir || defaultCacheDir || '默认应用数据目录'}
+            </span>
+          </div>
+          {editingDir ? (
+            <div className="setting-row">
+              <input
+                className="input setting-dir-input"
+                value={dirDraft}
+                spellCheck={false}
+                placeholder={'例如 D:\\QMusicCache'}
+                onChange={(event) => setDirDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') void saveCacheDir();
+                  if (event.key === 'Escape') setEditingDir(false);
+                }}
+              />
+              <button
+                type="button"
+                className="pill"
+                disabled={busy === 'cache-dir'}
+                onClick={() => void saveCacheDir()}
+              >
+                使用
+              </button>
+              <button type="button" className="pill" onClick={() => setEditingDir(false)}>
+                取消
+              </button>
+            </div>
+          ) : (
+            <div className="setting-row">
+              <span className="label">更换目录</span>
+              <div className="setting-actions">
+                <button
+                  type="button"
+                  className="pill"
+                  disabled={busy === 'cache-dir'}
+                  onClick={() => void browseCacheDir()}
+                >
+                  <FolderOpen />
+                  浏览…
+                </button>
+                <button
+                  type="button"
+                  className="pill"
+                  onClick={() => {
+                    setDirDraft(cacheDir || defaultCacheDir);
+                    setEditingDir(true);
+                  }}
+                >
+                  输入路径
+                </button>
+                {cacheDir && defaultCacheDir && cacheDir !== defaultCacheDir ? (
+                  <button
+                    type="button"
+                    className="pill"
+                    disabled={busy === 'cache-dir'}
+                    onClick={() => void resetCacheDir()}
+                  >
+                    恢复默认
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          )}
+          <div className="setting-row">
+            <span className="label">已用空间</span>
+            <span className="value">
+              {formatBytes(cacheUsedBytes)} · {cacheFileCount} 首
+            </span>
+            <button
+              type="button"
+              className="pill"
+              style={{ marginLeft: 'auto' }}
+              disabled={busy === 'stream-cache'}
+              onClick={() => void clearStream()}
+            >
+              清空
+            </button>
+          </div>
+          <p className="muted" style={{ marginTop: 10, fontSize: 11, lineHeight: 1.7 }}>
+            播放时把整首下载到本机并预取下一首：命中缓存直接读本地文件，网络波动不影响播放；
+            超过上限按最久未使用顺序自动清理。
+          </p>
+        </section>
+
+        <section className="setting-card">
+          <h3>
+            <Power />
+            窗口与托盘
+          </h3>
+          <div className="setting-row" style={{ marginTop: 8 }}>
+            <span className="label">点击关闭</span>
+            <div className="seg">
+              <button
+                type="button"
+                className={cn(closeAction === 'tray' && 'active')}
+                onClick={() => void updatePrefs({ closeAction: 'tray' })}
+              >
+                收进托盘
+              </button>
+              <button
+                type="button"
+                className={cn(closeAction === 'quit' && 'active')}
+                onClick={() => void updatePrefs({ closeAction: 'quit' })}
+              >
+                直接退出
+              </button>
+            </div>
+          </div>
+          <div className="setting-row">
+            <span className="label">最小化时</span>
+            <div className="seg">
+              <button
+                type="button"
+                className={cn(minimizeToTray && 'active')}
+                onClick={() => void updatePrefs({ minimizeToTray: true })}
+              >
+                收进托盘
+              </button>
+              <button
+                type="button"
+                className={cn(!minimizeToTray && 'active')}
+                onClick={() => void updatePrefs({ minimizeToTray: false })}
+              >
+                留在任务栏
+              </button>
+            </div>
+          </div>
+          <div className="setting-row">
+            <span className="label">托盘菜单</span>
+            <span className="value">显示主界面 / 播放暂停 / 上一首 / 下一首 / 退出</span>
+          </div>
+          <p className="muted" style={{ marginTop: 10, fontSize: 11, lineHeight: 1.7 }}>
+            收进托盘后窗口隐藏但播放继续；需要彻底退出请用托盘菜单里的「退出」，或把点击关闭改成直接退出。
+          </p>
+        </section>
+
+        <section className="setting-card">
+          <h3>
             <Database />
             本地数据
           </h3>
@@ -321,7 +581,7 @@ export default function SettingsPage() {
           </div>
           <div className="setting-row">
             <span className="label">命令面</span>
-            <span className="value">auth.* / api.call / sys.info / db.*</span>
+            <span className="value">auth.* / api.call / sys.info / db.* / cache.* / app.*</span>
           </div>
         </section>
 

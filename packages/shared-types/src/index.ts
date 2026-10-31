@@ -210,6 +210,38 @@ export interface SysInfo {
   runtime: 'tauri' | 'browser';
 }
 
+/** 点关闭按钮时的行为：收进托盘继续后台播放，或直接退出 */
+export type CloseAction = 'tray' | 'quit';
+
+/** 平台侧偏好（以 Rust 的 prefs.json 为准，启动与关闭窗口时都要用） */
+export interface ShellSettings {
+  closeAction: CloseAction;
+  /** 最小化窗口也收进托盘 */
+  minimizeToTray: boolean;
+  /** 播放时把整首音频缓存到本机 */
+  streamCache: boolean;
+  /** 当前生效的缓存目录 */
+  cacheDir: string;
+  defaultCacheDir: string;
+  cacheMaxBytes: number;
+  cacheUsedBytes: number;
+  cacheFileCount: number;
+}
+
+/** 播放缓存占用情况 */
+export interface StreamCacheStats {
+  dir: string;
+  defaultDir: string;
+  usedBytes: number;
+  fileCount: number;
+}
+
+/** 已落盘的音源，url 指向本地协议（qmcache://），播放时不走网络 */
+export interface CachedStream {
+  url: string;
+  bytes: number;
+}
+
 export interface QrStartResult {
   qrId: string;
   imageDataUrl: string;

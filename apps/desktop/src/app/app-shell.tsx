@@ -5,6 +5,7 @@ import { NowPlaying } from '@/features/player/NowPlaying';
 import { PlayerBar } from '@/features/player/PlayerBar';
 import { QueuePanel } from '@/features/player/QueuePanel';
 import { usePlayerStore } from '@/features/player/player-store';
+import { useShellBridge } from '@/features/player/use-shell-bridge';
 import { Sidebar } from '@/shared/components/Sidebar';
 import { TopBar } from '@/shared/components/TopBar';
 import { useGlobalHotkeys } from '@/shared/hooks/useGlobalHotkeys';
@@ -19,6 +20,7 @@ export function AppShell() {
   const location = useLocation();
 
   useGlobalHotkeys();
+  useShellBridge();
 
   const nowPlaying = usePresence(showNowPlaying);
   const queue = usePresence(showQueue);

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
 use rusqlite::Connection;
@@ -8,10 +9,12 @@ use serde_json::Value;
 use tokio::sync::Mutex as AsyncMutex;
 use uuid::Uuid;
 
+use crate::cache::StreamCache;
 use crate::db;
 use crate::error::{PResult, PlatformError};
 use crate::models::{account_from_credentials, Account, Credentials};
 use crate::net::Net;
+use crate::prefs::PrefStore;
 use crate::secret::SecretStore;
 
 pub struct QrSession {
@@ -31,12 +34,18 @@ pub struct AppState {
     pub guid: String,
     pub http: Net,
     pub db: Mutex<Connection>,
+    /// 平台侧偏好（关闭行为、缓存目录与上限），启动时就要可用，所以落在 prefs.json
+    pub prefs: PrefStore,
+    /// 整首音频缓存
+    pub cache: StreamCache,
     pub secret: SecretStore,
     pub credentials: RwLock<Option<Credentials>>,
     pub account: RwLock<Option<Account>>,
     pub qr_sessions: AsyncMutex<HashMap<String, Arc<AsyncMutex<QrSession>>>>,
     pub restore_cache: Mutex<Option<Value>>,
     pub restore_lock: AsyncMutex<()>,
+    /// 托盘是否可用：托盘建不起来就绝不能把窗口藏起来（否则用户再也叫不回来）
+    tray_ready: AtomicBool,
 }
 
 impl AppState {
@@ -48,17 +57,38 @@ impl AppState {
         let credentials = secret.load();
         let account = credentials.as_ref().map(account_from_credentials);
 
+        let prefs = PrefStore::load(&data_dir);
+        let default_cache_dir = data_dir.join("stream-cache");
+        let cache_dir = prefs
+            .get()
+            .cache_dir
+            .as_ref()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| default_cache_dir.clone());
+        let cache = StreamCache::new(default_cache_dir, cache_dir);
+
         Ok(Self {
             guid,
             http: Net::new(),
             db: Mutex::new(connection),
+            prefs,
+            cache,
             secret,
             credentials: RwLock::new(credentials),
             account: RwLock::new(account),
             qr_sessions: AsyncMutex::new(HashMap::new()),
             restore_cache: Mutex::new(None),
             restore_lock: AsyncMutex::new(()),
+            tray_ready: AtomicBool::new(false),
         })
+    }
+
+    pub fn set_tray_ready(&self, value: bool) {
+        self.tray_ready.store(value, Ordering::SeqCst);
+    }
+
+    pub fn tray_ready(&self) -> bool {
+        self.tray_ready.load(Ordering::SeqCst)
     }
 
     pub fn credentials(&self) -> Option<Credentials> {

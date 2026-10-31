@@ -10,7 +10,7 @@ rust-version = "1.77"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["time", "sync", "macros", "rt-multi-thread"] }
@@ -23,6 +23,20 @@ url = "2"
 httpdate = "1"
 regex = "1"
 keyring = { version = "3", default-features = false, features = ["windows-native"] }
+# 单实例：第二个进程只负责唤醒已有面板后立刻退出，不重建窗口 / 托盘 / 数据库。
+# semver 特性把版本兼容族拼进互斥量 / 信箱窗口名（0.1.0 → com.qmusic.lite_0_1_x），
+# 跨不兼容边界（如 0.2.0、1.0.0）时新旧版本可并存，不会被旧实例拦截。
+tauri-plugin-single-instance = { version = "2", features = ["semver"] }
+
+[features]
+# Tauri 2 用 `tauri/custom-protocol` 判定 dev 还是生产（`tauri_build::is_dev()` 读 `DEP_TAURI_DEV`）。
+# 裸奔 `cargo build --release` 不带它，二进制会被当成 dev：webview 去连 devUrl（http://localhost:5273）
+# 而不是加载内嵌的 dist，表现为「localhost 拒绝连接」。`tauri build` 会自动带上这个 feature。
+custom-protocol = ["tauri/custom-protocol"]
+
+[target.'cfg(windows)'.dependencies]
+# 原生文件夹选择器（IFileOpenDialog）：crate 已在依赖树里，开启对应 feature 即可，不额外引入插件
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_System_Com", "Win32_UI_Shell"] }
 
 [dev-dependencies]
 tempfile = "3"

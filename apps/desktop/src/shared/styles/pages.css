@@ -909,6 +909,28 @@
   color: var(--text);
 }
 
+/* 缓存目录这类长路径：单行省略，完整值放 title */
+.setting-row .value.setting-path {
+  max-width: 62%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.setting-row .setting-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-left: auto;
+}
+
+.setting-row .setting-dir-input {
+  flex: 1;
+  height: 32px;
+  font-size: 12px;
+}
+
 .settings-account {
   display: flex;
   align-items: center;
