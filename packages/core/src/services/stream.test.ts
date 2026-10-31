@@ -62,6 +62,41 @@ describe('音质降级链', () => {
   });
 });
 
+describe('vkey 请求参数', () => {
+  it('platform 传字符串 "20"，数字会让服务端返回业务码 10006', async () => {
+    const transport = transportWith(() => vkeyResponse('ok.mp3'));
+    await new QqApi(transport).vkey({
+      filenames: ['M800abcabc.mp3'],
+      songmids: ['abc'],
+      songtypes: [0],
+      guid: 'g',
+      uin: '0',
+    });
+
+    const sent = (transport.call as unknown as { mock: { calls: unknown[][] } }).mock.calls[0][0] as {
+      param: Record<string, unknown>;
+    };
+    expect(sent.param.platform).toBe('20');
+    expect(sent.param.loginflag).toBe(1);
+  });
+
+  it('songType 只允许 0/1：老队列里残留的歌单来源标记 13 不会透传', async () => {
+    const transport = transportWith(() => vkeyResponse('ok.mp3'));
+    const service = new StreamService(new QqApi(transport), createMemoryCache(), () => ({
+      guid: 'g',
+      uin: 'u',
+      quality: '128',
+    }));
+
+    await service.resolve(makeSong({ songType: 13 }));
+
+    const sent = (transport.call as unknown as { mock: { calls: unknown[][] } }).mock.calls[0][0] as {
+      param: Record<string, unknown>;
+    };
+    expect(sent.param.songtype).toEqual([0]);
+  });
+});
+
 describe('StreamService', () => {
   it('返回拼好的直链与音质', async () => {
     const transport = transportWith(() => vkeyResponse('M800songmidsongmid.mp3?vkey=1'));
@@ -105,6 +140,26 @@ describe('StreamService', () => {
     }));
 
     await expect(service.resolve(makeSong())).rejects.toBeInstanceOf(StreamUnavailableError);
+  });
+
+  it('服务端拒绝时把业务码带进错误信息', async () => {
+    const transport = transportWith(() => ({
+      code: 0,
+      req_0: {
+        code: 0,
+        data: {
+          sip: ['https://isure.stream.qqmusic.qq.com/'],
+          midurlinfo: [{ purl: '', result: 101404 }],
+        },
+      },
+    }));
+    const service = new StreamService(new QqApi(transport), createMemoryCache(), () => ({
+      guid: 'g',
+      uin: 'u',
+      quality: '128',
+    }));
+
+    await expect(service.resolve(makeSong())).rejects.toThrow('101404');
   });
 
   it('20 分钟内命中缓存，不重复请求', async () => {

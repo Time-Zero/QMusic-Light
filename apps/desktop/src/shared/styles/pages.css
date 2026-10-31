@@ -141,65 +141,116 @@
 }
 
 /* ------------------------------ 播放页 ------------------------------ */
+/*
+ * 全屏播放页：覆盖整个窗口（侧栏、顶栏、播放条之上），不再留边距。
+ * 纵向三行：顶栏 / 主体 / 控制区；主体再分「封面信息」与「歌词」两列。
+ */
 .nowplaying {
   position: fixed;
-  inset: 0 var(--player-gap) calc(var(--player-h) + var(--player-gap)) var(--player-gap);
+  inset: 0;
   z-index: 40;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: var(--radius-xl);
-  background:
-    radial-gradient(720px 520px at 16% 4%, color-mix(in oklab, var(--cover-a, var(--paper-2)) 42%, var(--paper)), transparent 64%),
-    radial-gradient(680px 480px at 94% 92%, color-mix(in oklab, var(--cover-b, var(--paper-2)) 34%, var(--paper)), transparent 66%),
-    var(--paper);
-  box-shadow: var(--shadow-card);
+  background: var(--paper);
   color: var(--ink);
+  /* 背景层用负 z-index，隔离避免溢到应用其他区域 */
+  isolation: isolate;
+}
+
+/* 封面模糊底：给整页一个与歌曲同源的色彩氛围，纯装饰 */
+.np-backdrop {
+  position: absolute;
+  inset: -10vh -8vw;
+  z-index: -2;
+  overflow: hidden;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.np-backdrop img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(72px) saturate(1.15);
+  transform: scale(1.06);
+}
+
+/* 纸色遮罩：越靠近底部越实，保证标题与控制的对比度 */
+.np-veil {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(72% 62% at 90% 2%, color-mix(in oklab, var(--cover-a, var(--paper-2)) 46%, transparent), transparent 70%),
+    radial-gradient(64% 58% at 4% 98%, color-mix(in oklab, var(--cover-b, var(--paper-2)) 38%, transparent), transparent 72%),
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--paper) 80%, transparent) 0%,
+      color-mix(in oklab, var(--paper) 88%, transparent) 52%,
+      var(--paper) 100%
+    );
 }
 
 .np-top {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   flex: none;
   align-items: center;
   gap: var(--sp-3);
   height: 58px;
-  padding: 0 var(--sp-6);
+  padding: 0 clamp(16px, 3vw, 32px);
 }
 
 .np-top .np-title {
   color: var(--text-tertiary);
   font-size: var(--fs-xs);
+  letter-spacing: 0.04em;
 }
 
 .np-top .spacer {
   flex: 1;
 }
 
+/* 主体：两列都撑满可用高度，左列内容在垂直方向居中 */
 .np-body {
   position: relative;
   z-index: 1;
   display: grid;
   flex: 1;
-  grid-template-columns: minmax(280px, 420px) minmax(320px, 1fr);
-  align-items: center;
-  gap: var(--sp-10);
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  align-items: stretch;
+  gap: clamp(32px, 5vw, 80px);
   min-height: 0;
-  padding: 0 var(--sp-10) var(--sp-5);
+  padding: clamp(4px, 1.6vh, 18px) clamp(20px, 5vw, 64px) clamp(8px, 2vh, 24px);
+}
+
+.np-stage {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: clamp(16px, 2.8vh, 26px);
+  width: min(100%, 440px);
+  min-width: 0;
+  min-height: 0;
+  margin-inline: auto;
+  text-align: center;
 }
 
 .np-cover {
   position: relative;
-  display: grid;
-  place-items: center;
-  width: 100%;
-  max-width: min(100%, 44vh);
+  flex: none;
+  width: min(100%, 44vh, 400px);
   aspect-ratio: 1 / 1;
   overflow: hidden;
   border-radius: var(--radius-xl);
   background: linear-gradient(150deg, var(--cover-a, var(--paper-3)), var(--cover-b, var(--paper-2)));
-  box-shadow: var(--shadow-lift);
+  box-shadow:
+    0 30px 70px -32px var(--shade-3),
+    inset 0 0 0 1px var(--hi);
 }
 
 .np-cover img {
@@ -210,39 +261,133 @@
   object-fit: cover;
 }
 
-.np-cover .glyph {
-  position: relative;
-  z-index: 1;
+.np-cover .g {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
   color: var(--clay-ink);
   font-size: 56px;
 }
 
-.np-info {
+.np-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
   min-width: 0;
 }
 
-.np-info .kicker {
+.np-meta .kicker {
+  max-width: 100%;
+  overflow: hidden;
   color: var(--accent-text);
   font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.np-info h1 {
-  margin: var(--sp-2) 0 6px;
+.np-meta h1 {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
   font-family: var(--font-display);
-  font-size: 34px;
+  font-size: clamp(24px, 2.6vw, 36px);
   font-weight: 500;
-  line-height: 1.1;
-  letter-spacing: -0.024em;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
-.np-info .sub {
+.np-meta .sub {
+  max-width: 100%;
   color: var(--text-tertiary);
   font-size: var(--fs-xs);
+  line-height: 1.5;
+}
+
+.np-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+
+.np-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 var(--sp-4);
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--ink) 6%, transparent);
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    transform var(--dur-press) var(--ease-out);
+}
+
+.np-action:hover {
+  background: color-mix(in oklab, var(--ink) 10%, transparent);
+  color: var(--text);
+}
+
+.np-action:active {
+  transform: scale(0.97);
+}
+
+.np-action svg {
+  width: 15px;
+  height: 15px;
+}
+
+.np-action.is-liked {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+/* 歌词列：随主体高度拉伸，头部固定，列表独立滚动 */
+.np-lyric-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding-top: clamp(4px, 2vh, 20px);
+}
+
+.np-lyric-head {
+  display: flex;
+  flex: none;
+  align-items: baseline;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-2);
+}
+
+.np-lyric-head h2 {
+  color: var(--accent-text);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+}
+
+.np-lyric-hint {
+  margin-left: auto;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  opacity: 0.8;
 }
 
 .np-lyrics {
-  height: min(38vh, 340px);
-  margin-top: var(--sp-5);
+  position: relative;
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   padding-right: var(--sp-2);
   /* 跟随由 LyricList 自己驱动：瞬移 scrollTop + 位移补间。
@@ -251,40 +396,58 @@
   scroll-behavior: auto;
   /* 歌词内部滚动不向外传播重排 */
   contain: layout;
-  mask-image: linear-gradient(180deg, transparent, var(--ink) 12%, var(--ink) 82%, transparent);
-  -webkit-mask-image: linear-gradient(180deg, transparent, var(--ink) 12%, var(--ink) 82%, transparent);
+  mask-image: linear-gradient(180deg, transparent 0, var(--ink) 10%, var(--ink) 90%, transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    180deg,
+    transparent 0,
+    var(--ink) 10%,
+    var(--ink) 90%,
+    transparent 100%
+  );
+}
+
+.np-lyrics.is-empty {
+  display: grid;
+  place-items: center;
 }
 
 /*
  * 歌词轨道：换行时那一小段位移由合成器插值，主线程只在换行瞬间干一次活。
  * 位移量由 LyricList 写成内联 transform，这里只提供过渡曲线。
+ * 上下留白让第一句和最后一句也能滚到视觉中心。
  */
 .np-lyric-track {
+  padding-block: clamp(40px, 20vh, 160px);
   transform: translate3d(0, 0, 0);
   transition: transform 320ms var(--ease-out);
 }
 
 .lyric-line {
-  padding: var(--sp-2) 0;
-  color: color-mix(in oklab, var(--ink) 34%, transparent);
-  font-size: 14.5px;
-  line-height: 1.55;
+  padding: clamp(7px, 1.1vh, 12px) 0;
+  color: color-mix(in oklab, var(--ink) 32%, transparent);
+  font-size: clamp(15px, 1.35vw, 19px);
+  line-height: 1.5;
+  cursor: pointer;
   transform-origin: left center;
   transition:
     color var(--dur-base) var(--ease-out),
     transform var(--dur-base) var(--ease-out);
 }
 
+.lyric-line:hover {
+  color: color-mix(in oklab, var(--ink) 62%, transparent);
+}
+
 .lyric-line .trans {
   display: block;
   margin-top: 4px;
   color: color-mix(in oklab, var(--ink) 24%, transparent);
-  font-size: 11.5px;
+  font-size: clamp(11.5px, 0.95vw, 13px);
 }
 
 .lyric-line.static {
   color: var(--text-tertiary);
-  font-size: var(--fs-sm);
+  font-size: clamp(14px, 1.2vw, 17px);
 }
 
 .lyric-line.static:hover {
@@ -294,7 +457,7 @@
 .lyric-line.active {
   color: var(--text);
   font-weight: 500;
-  transform: scale(1.03);
+  transform: scale(1.02);
 }
 
 .lyric-line.active .trans {
@@ -302,73 +465,63 @@
 }
 
 .lyric-empty {
-  padding: var(--sp-10) 0;
   color: var(--text-tertiary);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+  text-align: center;
 }
 
+/* 底部：进度条与控制按钮整体居中，宽度有上限，宽屏不散开 */
 .np-progress {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   flex: none;
-  padding: 0 var(--sp-10) var(--sp-8);
+  padding: 0 clamp(20px, 5vw, 64px) clamp(16px, 3vh, 32px);
 }
 
 .np-progress .progress-row {
+  width: min(100%, 760px);
   max-width: none;
+  margin-inline: auto;
 }
 
 .np-progress .time {
-  width: 42px;
+  width: 44px;
   color: var(--text-tertiary);
+  font-size: 11px;
 }
 
 .np-progress .bar .rail {
-  background: var(--paper-3);
+  background: color-mix(in oklab, var(--ink) 12%, transparent);
 }
 
 .np-controls {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--sp-6);
-  margin-top: var(--sp-2);
+  gap: clamp(14px, 2.4vw, 30px);
+  margin-top: clamp(8px, 1.6vh, 14px);
 }
 
 .np-controls .icon-btn {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   color: var(--text-secondary);
 }
 
 .np-controls .icon-btn svg {
-  width: 19px;
-  height: 19px;
-}
-
-.np-controls .ctrl-main {
-  width: 54px;
-  height: 54px;
-}
-
-.np-controls .ctrl-main svg {
   width: 20px;
   height: 20px;
 }
 
-.np-aside {
-  position: absolute;
-  right: var(--sp-6);
-  bottom: var(--sp-6);
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
+.np-controls .ctrl-main {
+  width: 58px;
+  height: 58px;
 }
 
-.np-aside .icon-btn svg {
-  width: 18px;
-  height: 18px;
+.np-controls .ctrl-main svg {
+  width: 21px;
+  height: 21px;
 }
 
 /* ------------------------------ 队列抽屉 ------------------------------ */
@@ -1117,37 +1270,44 @@
 
 @media (max-width: 1180px) {
   .np-body {
-    grid-template-columns: minmax(240px, 340px) minmax(280px, 1fr);
-    gap: var(--sp-8);
-    padding: 0 var(--sp-8) var(--sp-3);
+    gap: clamp(24px, 4vw, 48px);
+    padding-inline: clamp(20px, 4vw, 40px);
   }
 
-  .np-info h1 {
-    font-size: 28px;
+  .np-stage {
+    width: min(100%, 380px);
+  }
+
+  .np-cover {
+    width: min(100%, 40vh, 340px);
+  }
+
+  .np-meta h1 {
+    font-size: clamp(22px, 2.4vw, 30px);
   }
 
   .np-progress {
-    padding: 0 var(--sp-8) var(--sp-6);
+    padding-inline: clamp(20px, 4vw, 40px);
   }
 }
 
 @media (max-width: 980px) {
   .np-body {
-    grid-template-columns: minmax(220px, 300px) minmax(260px, 1fr);
+    grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.14fr);
     gap: var(--sp-6);
-    padding: 0 var(--sp-6) var(--sp-2);
   }
 
-  .np-lyrics {
-    height: 30vh;
+  .np-cover {
+    width: min(100%, 36vh, 300px);
+  }
+
+  .np-lyric-track {
+    padding-block: clamp(32px, 16vh, 120px);
   }
 
   .np-progress {
-    padding: 0 var(--sp-6) var(--sp-5);
-  }
-
-  .np-aside {
-    display: none;
+    padding-inline: var(--sp-6);
+    padding-bottom: clamp(12px, 2.4vh, 24px);
   }
 
   .settings-grid {
@@ -1156,5 +1316,195 @@
 
   .queue-panel {
     width: calc(100vw - var(--player-gap) * 2);
+  }
+}
+
+/* 窄窗：改为「小封面 + 信息」在上、歌词在下的单列结构 */
+@media (max-width: 820px) {
+  .np-top {
+    gap: var(--sp-2);
+    padding-inline: var(--sp-4);
+  }
+
+  .np-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: clamp(14px, 2.4vh, 24px);
+    padding: 0 var(--sp-4) var(--sp-1);
+  }
+
+  .np-stage {
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    gap: var(--sp-4);
+    width: 100%;
+    margin-inline: 0;
+    text-align: left;
+  }
+
+  .np-cover {
+    width: clamp(84px, 17vw, 128px);
+    border-radius: var(--radius-lg);
+  }
+
+  .np-meta {
+    align-items: flex-start;
+  }
+
+  .np-meta h1 {
+    font-size: clamp(19px, 3.4vw, 25px);
+    -webkit-line-clamp: 1;
+  }
+
+  .np-actions {
+    margin-top: var(--sp-2);
+  }
+
+  .np-action {
+    height: 30px;
+    padding: 0 var(--sp-3);
+  }
+
+  .np-lyric-panel {
+    padding-top: 0;
+  }
+
+  .np-lyric-head {
+    padding-bottom: var(--sp-1);
+  }
+
+  .np-lyric-track {
+    padding-block: clamp(28px, 12vh, 96px);
+  }
+
+  .np-progress {
+    padding-inline: var(--sp-4);
+  }
+}
+
+@media (max-width: 560px) {
+  .np-top {
+    gap: 6px;
+  }
+
+  .np-top .np-title,
+  .np-top .playing-badge {
+    display: none;
+  }
+
+  .np-top .win-controls {
+    gap: 0;
+    margin-left: var(--sp-1);
+  }
+
+  .np-top .win-btn {
+    width: 34px;
+  }
+
+  .np-cover {
+    width: clamp(72px, 21vw, 100px);
+  }
+
+  .np-meta .kicker {
+    display: none;
+  }
+
+  .np-meta h1 {
+    font-size: 18px;
+  }
+
+  .np-meta .sub {
+    font-size: 11px;
+  }
+
+  .np-action {
+    gap: 5px;
+    height: 28px;
+    padding: 0 10px;
+    font-size: 11px;
+  }
+
+  .np-action svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .np-lyric-hint {
+    display: none;
+  }
+
+  .lyric-line {
+    font-size: 14.5px;
+  }
+
+  .np-progress .progress-row {
+    gap: 6px;
+  }
+
+  .np-progress .time {
+    width: 34px;
+    font-size: 10px;
+  }
+
+  .np-controls {
+    gap: 8px;
+  }
+
+  .np-controls .icon-btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  .np-controls .icon-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .np-controls .ctrl-main {
+    width: 46px;
+    height: 46px;
+  }
+
+  .np-controls .ctrl-main svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+/* 矮窗：压缩顶栏与封面，优先保证歌词和控制区可用 */
+@media (max-height: 640px) {
+  .np-top {
+    height: 48px;
+  }
+
+  .np-stage {
+    gap: var(--sp-3);
+  }
+
+  .np-meta h1 {
+    font-size: clamp(20px, 2.6vw, 28px);
+  }
+
+  .np-actions {
+    margin-top: var(--sp-2);
+  }
+
+  .np-lyric-track {
+    padding-block: clamp(24px, 14vh, 80px);
+  }
+
+  .np-progress {
+    padding-bottom: var(--sp-4);
+  }
+
+  .np-controls {
+    margin-top: var(--sp-1);
+  }
+}
+
+@media (max-height: 640px) and (min-width: 821px) {
+  .np-cover {
+    width: min(100%, 36vh, 300px);
   }
 }

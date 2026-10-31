@@ -5,7 +5,7 @@ import {
   type StreamInfo,
 } from '@qmusic/shared-types';
 import type { QqApi } from '../qq/client';
-import { asArr, asObj, num, str } from '../qq/mappers';
+import { asArr, asObj, num, sanitizeSongType, str } from '../qq/mappers';
 import { TTL, type CacheStore } from '../cache/policy';
 
 const FILE_META: Record<Quality, { prefix: string; ext: string }> = {
@@ -75,7 +75,8 @@ export class StreamService {
           await this.api.vkey({
             filenames: [buildFilename(song, q)],
             songmids: [song.mid],
-            songtypes: [song.songType || 0],
+            // 歌单接口的 songtype 是来源标记（12/13），透传会得到 101404；只允许 0/1
+            songtypes: [sanitizeSongType(song.songType)],
             guid: options.guid,
             uin: options.uin,
           }),
@@ -83,12 +84,11 @@ export class StreamService {
         const info = asObj(asArr(data.midurlinfo)[0]);
         const purl = str(info.purl);
         const retcode = num(info.result, data.retcode);
-        if (retcode !== 0 && !purl) {
-          lastMessage = str(info.errtype, info.msg) || lastMessage;
-          continue;
-        }
         if (!purl) {
-          lastMessage = str(info.errtype, info.msg) || lastMessage;
+          // 服务端的 tips / 业务码比「无版权或需要会员」更能说明原因（如 101404 参数不匹配、104009 掉登录）
+          const detail = str(info.tips, info.errtype, info.msg);
+          lastMessage =
+            detail || (retcode ? `无版权或需要会员（${retcode}）` : '无版权或需要会员');
           continue;
         }
         const sip = str(asArr<string>(data.sip)[0], DEFAULT_SIP);

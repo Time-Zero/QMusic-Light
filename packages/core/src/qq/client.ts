@@ -91,7 +91,8 @@ export class QqApi {
       guid: params.guid,
       uin: params.uin,
       loginflag: 1,
-      platform: 20,
+      // platform 必须是字符串 "20"：传数字会被服务端判为参数非法，返回业务码 10006
+      platform: '20',
     });
   }
 

@@ -61,6 +61,13 @@ describe('歌曲映射', () => {
     const song = mapSongDetail({ track_info: rawSong });
     expect(song?.name).toBe('雾雨一夜');
   });
+
+  it('歌单里的 songtype 是来源标记，songType 只认 type（0/1）', () => {
+    // 实测歌单接口返回 type: 0、songtype: 13；把 13 传给 vkey 会得到 101404 / purl 为空
+    expect(toSong({ ...rawSong, type: 0, songtype: 13 })?.songType).toBe(0);
+    expect(toSong({ ...rawSong, type: 1, songtype: 13 })?.songType).toBe(1);
+    expect(toSong({ ...rawSong, type: undefined, songtype: 13 })?.songType).toBe(0);
+  });
 });
 
 describe('歌单映射', () => {

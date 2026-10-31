@@ -54,6 +54,20 @@ function decodeEntities(input: string): string {
 
 /* ------------------------------ Song ------------------------------ */
 
+/**
+ * vkey 的 songtype 只认 0（普通）/1（伴唱）。歌单接口里的 `songtype` 是来源标记
+ * （实测恒为 12/13），透传会让服务端返回 101404、purl 为空，表现为「无版权或需要会员」。
+ * 因此只取 track_info.type，并把其它取值收敛回 0。
+ */
+export function normalizeSongType(raw: Raw): number {
+  return sanitizeSongType(num(raw.type, raw.songtype));
+}
+
+/** 同一条规则用在已持久化的 Song 上：老队列里可能还留着 12/13 */
+export function sanitizeSongType(value: number): number {
+  return value === 1 ? 1 : 0;
+}
+
 function detectMaxQuality(file: Raw): Quality | undefined {
   if (num(file.size_flac, file.size_hires) > 0) return 'flac';
   if (num(file.size_320mp3) > 0) return '320';
@@ -98,7 +112,7 @@ export function toSong(rawInput: unknown): Song | null {
     mediaMid: str(file.media_mid, raw.media_mid, raw.mediaMid, mid),
     payPlay: num(pay.pay_play, raw.payplay),
     playable: hasFile && only === 0,
-    songType: num(raw.songtype, raw.type),
+    songType: normalizeSongType(raw),
     maxQuality,
   };
 

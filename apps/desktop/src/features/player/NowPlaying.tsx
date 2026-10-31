@@ -228,6 +228,12 @@ export function NowPlaying({ closing = false }: { closing?: boolean }) {
       aria-label="正在播放"
       inert={closing || undefined}
     >
+      {/* 全屏背景：封面高斯模糊 + 取色渐变遮罩，保证前景文字始终可读 */}
+      <div className="np-backdrop" aria-hidden="true">
+        {song.cover ? <img src={song.cover} alt="" /> : null}
+      </div>
+      <div className="np-veil" aria-hidden="true" />
+
       <div className="np-top" data-tauri-drag-region={IS_TAURI ? true : undefined}>
         <button
           type="button"
@@ -263,20 +269,50 @@ export function NowPlaying({ closing = false }: { closing?: boolean }) {
       </div>
 
       <div className="np-body">
-        <div className="np-cover">
-          <CoverImage src={song.cover} alt={song.name} glyph="♫" />
+        <div className="np-stage">
+          <div className="np-cover">
+            <CoverImage src={song.cover} alt={song.name} glyph="♫" />
+          </div>
+
+          <div className="np-meta">
+            <div className="kicker">NOW PLAYING · {song.albumName || '未知专辑'}</div>
+            <h1>{song.name}</h1>
+            <div className="sub">
+              {singerNames(song.singers)}
+              {song.payPlay === 1 ? ' · VIP 曲目（不绕过付费限制）' : ''}
+            </div>
+
+            <div className="np-actions">
+              <button
+                type="button"
+                className={cn('np-action', liked && 'is-liked')}
+                title={liked ? '取消喜欢' : '喜欢'}
+                onClick={() => void like()}
+              >
+                <Heart fill={liked ? 'currentColor' : 'none'} />
+                {liked ? '已喜欢' : '喜欢'}
+              </button>
+              <button
+                type="button"
+                className="np-action"
+                title="播放队列"
+                onClick={() => setShowQueue(true)}
+              >
+                <ListMusic />
+                播放队列
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="np-info">
-          <div className="kicker">NOW PLAYING · {song.albumName || '未知专辑'}</div>
-          <h1>{song.name}</h1>
-          <div className="sub">
-            {singerNames(song.singers)}
-            {song.payPlay === 1 ? ' · VIP 曲目（不绕过付费限制）' : ''}
+        <div className="np-lyric-panel">
+          <div className="np-lyric-head">
+            <h2>歌词</h2>
+            {lines.length > 0 ? <span className="np-lyric-hint">点击任意一句可跳转</span> : null}
           </div>
 
           {lyric.isLoading ? (
-            <div className="np-lyrics">
+            <div className="np-lyrics is-empty">
               <div className="lyric-empty">歌词加载中…</div>
             </div>
           ) : lines.length > 0 ? (
@@ -292,7 +328,7 @@ export function NowPlaying({ closing = false }: { closing?: boolean }) {
               </div>
             </div>
           ) : (
-            <div className="np-lyrics">
+            <div className="np-lyrics is-empty">
               <div className="lyric-empty">
                 {lyric.isError ? '歌词获取失败，稍后重试' : '暂无歌词，纯音乐请欣赏'}
               </div>
@@ -339,26 +375,6 @@ export function NowPlaying({ closing = false }: { closing?: boolean }) {
             {mode === 'single' ? <Repeat1 /> : <Repeat />}
           </button>
         </div>
-      </div>
-
-      <div className="np-aside">
-        <button
-          type="button"
-          className="icon-btn"
-          title={liked ? '取消喜欢' : '喜欢'}
-          onClick={() => void like()}
-          style={{ color: liked ? '#f2555a' : undefined }}
-        >
-          <Heart fill={liked ? 'currentColor' : 'none'} />
-        </button>
-        <button
-          type="button"
-          className="icon-btn"
-          title="播放队列"
-          onClick={() => setShowQueue(true)}
-        >
-          <ListMusic />
-        </button>
       </div>
     </section>
   );
