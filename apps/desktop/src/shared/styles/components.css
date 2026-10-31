@@ -511,29 +511,61 @@
 
 /* ----------------------------- tracks ----------------------------- */
 .track-table {
-  overflow: hidden;
   border-radius: var(--radius-lg);
 }
 
+/*
+ * 表头和数据行共用一份列定义，并且都住在 .track-scroll 里：
+ * 垂直滚动条只会同时缩窄两者，列不会错开；表头顺带吸顶。
+ * 注意 .track-table 不能设 overflow:hidden —— 那会让表头认错滚动祖先，sticky 失效。
+ */
 .track-head,
 .track {
   display: grid;
-  grid-template-columns: 42px minmax(180px, 1.6fr) minmax(110px, 1fr) minmax(100px, 0.9fr) 60px 34px;
+  grid-template-columns:
+    42px /* # */
+    minmax(200px, 1fr) /* 封面 + 标题 */
+    minmax(110px, 240px) /* 歌手 */
+    minmax(130px, 320px) /* 专辑 */
+    60px /* 时长 */
+    34px; /* 喜欢 */
   align-items: center;
   gap: 14px;
   padding: 0 var(--sp-4);
 }
 
 .track-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   height: 32px;
+  /* 吸顶表头必须有实色底，否则滚上来的行会从字缝里透出来 */
+  background: var(--paper);
   border-bottom: 1px solid var(--rule);
   color: var(--text-tertiary);
   font-size: 11px;
 }
 
+/*
+ * 行里第二格先画 34px 封面再画标题，表头的「标题」要跳过封面的宽度
+ * 才落在歌名正上方（34 封面 + 11 行内 gap），否则它会悬在封面上方。
+ */
+.track-head > :nth-child(2) {
+  padding-left: 45px;
+}
+
+/* 骨架屏的表头直接挂在 .track-table 下、没有滚动容器，不该跟着整页吸顶 */
+.track-table > .track-head {
+  position: static;
+}
+
 .track-scroll {
   overflow: auto;
   max-height: var(--track-scroll-h, 460px);
+  border-radius: inherit;
+  /* 细滚动条：默认 17px 的那条会把整张表往左挤，视觉上比列宽本身更抢眼 */
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule-strong) transparent;
 }
 
 .track {
@@ -615,6 +647,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   transition: color var(--dur-base) var(--ease-out);
+}
+
+/* 长歌名可以收缩到省略号，但不能把 HQ / VIP 徽标顶出可视区 */
+.track .title .ellipsis {
+  min-width: 0;
 }
 
 .track .title em {
@@ -742,6 +779,27 @@ html[data-window-focus='blurred'] .boot-loading span {
   display: flex;
   justify-content: center;
   padding: var(--sp-5) 0 var(--sp-1);
+}
+
+/*
+ * 内容区收到 1100 以下时，六列的下限之和已经超过可用宽度了。
+ * 让专辑列先让位：宁可少一列，也不要挤到标题只剩省略号、还多出横向滚动条。
+ */
+@media (max-width: 1100px) {
+  .track-head,
+  .track {
+    grid-template-columns:
+      42px
+      minmax(160px, 1fr)
+      minmax(96px, 200px)
+      60px
+      34px;
+  }
+
+  .track-head > :nth-child(4),
+  .track > :nth-child(4) {
+    display: none;
+  }
 }
 
 /* ------------------------------ tabs ------------------------------ */

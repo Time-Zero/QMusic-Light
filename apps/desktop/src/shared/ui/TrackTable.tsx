@@ -1,6 +1,6 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Heart } from 'lucide-react';
-import { useRef, type CSSProperties } from 'react';
+import { useMemo, useRef, type CSSProperties } from 'react';
 import type { Song } from '@qmusic/shared-types';
 import { coverVars } from '@/shared/lib/color';
 import { cn } from '@/shared/lib/cn';
@@ -31,10 +31,21 @@ export function TrackTable({
   const virtual = songs.length > 60;
   const parentRef = useRef<HTMLDivElement>(null);
 
+  /*
+   * 行高只有 --row-h 一个来源，虚拟滚动必须读同一个值：
+   * 估算值一旦和 CSS 对不上，滚动过程中行就会越走越偏，最后叠在一起。
+   */
+  const rowHeight = useMemo(() => {
+    if (typeof window === 'undefined') return 52;
+    const raw = getComputedStyle(document.documentElement).getPropertyValue('--row-h');
+    const px = Number.parseInt(raw, 10);
+    return Number.isFinite(px) && px > 0 ? px : 52;
+  }, []);
+
   const virtualizer = useVirtualizer({
     count: songs.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 52,
+    estimateSize: () => rowHeight,
     overscan: 10,
   });
 
@@ -42,15 +53,19 @@ export function TrackTable({
 
   return (
     <div className="track-table">
-      <div className="track-head" aria-hidden="true">
-        <span style={{ textAlign: 'center' }}>#</span>
-        <span>标题</span>
-        <span>歌手</span>
-        {showAlbum ? <span>专辑</span> : <span />}
-        <span style={{ textAlign: 'right' }}>时长</span>
-        <span />
-      </div>
+      {/*
+       * 表头和数据行都住在滚动容器里：滚动条只会同时缩窄两者，
+       * 列永远对得上；顺带获得吸顶效果，滚到第 100 首也知道每列是什么。
+       */}
       <div className="track-scroll" ref={parentRef} style={scrollStyle}>
+        <div className="track-head" aria-hidden="true">
+          <span style={{ textAlign: 'center' }}>#</span>
+          <span>标题</span>
+          <span>歌手</span>
+          {showAlbum ? <span>专辑</span> : <span />}
+          <span style={{ textAlign: 'right' }}>时长</span>
+          <span />
+        </div>
         {virtual ? (
           <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
             {virtualizer.getVirtualItems().map((item) => {
