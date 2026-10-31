@@ -486,43 +486,48 @@ async fn complete_login(net: &Net, check_url: &str) -> PResult<(Account, Credent
     Ok((account, credentials))
 }
 
-/// 用户资料：老 CGI，g_tk = hash33(musickey, 5381)（文档 §3.4）
+/// QQ 头像常返回 http:// 链接，统一升级成 https，避免 WebView 混合内容拦截
+fn upgrade_https(url: &str) -> String {
+    match url.strip_prefix("http://") {
+        Some(rest) => format!("https://{rest}"),
+        None => url.to_string(),
+    }
+}
+
+/// 用户资料：老 CGI `fcg_get_profile_homepage.fcg` 已下线（实测 200 空包），
+/// 改用 musicu 的 `music.UserInfo.userInfoServer / GetLoginUserInfo`（文档 §3.4）
 pub async fn fetch_profile(net: &Net, credentials: &Credentials) -> Profile {
     let result = async {
-        let mut url = Url::parse("https://c6.y.qq.com/rsc/fcgi-bin/fcg_get_profile_homepage.fcg")
-            .map_err(|error| PlatformError::msg(error.to_string()))?;
-        {
-            let mut query = url.query_pairs_mut();
-            query.append_pair("userid", &credentials.musicid);
-            query.append_pair("g_tk", &hash33(&credentials.musickey, 5381).to_string());
-            query.append_pair("format", "json");
-            query.append_pair("inCharset", "utf8");
-            query.append_pair("outCharset", "utf-8");
-            query.append_pair("notice", "0");
-            query.append_pair("platform", "yqq.json");
-            query.append_pair("needNewCode", "0");
-        }
-        let headers = vec![("Cookie".to_string(), cookie_header_from(credentials, None))];
+        let payload = json!({
+            "comm": { "ct": 24, "cv": 4747474, "uin": "0", "format": "json", "tmeLoginType": 2 },
+            "req_0": {
+                "module": "music.UserInfo.userInfoServer",
+                "method": "GetLoginUserInfo",
+                "param": {},
+            },
+        });
+        let headers = vec![
+            ("Content-Type".to_string(), "application/json".to_string()),
+            ("Cookie".to_string(), cookie_header_from(credentials, None)),
+        ];
         let response = net
-            .request_with_retry(url.as_str(), "GET", &headers, None)
+            .request_with_retry(MUSICU, "POST", &headers, Some(payload.to_string()))
             .await?;
         let json = response.json_loose();
-        let creator = json
-            .get("data")
-            .and_then(|value| value.get("creator"))
+        let data = json
+            .get("req_0")
+            .and_then(|value| value.get("data"))
+            .or_else(|| json.get("data"))
             .cloned()
             .unwrap_or_else(|| json!({}));
-        let vip = creator.get("vip").cloned().unwrap_or_else(|| json!({}));
+        let info = data.get("info").cloned().unwrap_or_else(|| json!({}));
 
         Ok::<Profile, PlatformError>(Profile {
-            nickname: {
-                let nick = get_string(&creator, &["nick", "nickname"]);
-                nick
-            },
-            avatar: get_string(&creator, &["headpic", "avatar"]),
-            encrypt_uin: get_string(&creator, &["encrypt_uin", "encryptUin"]),
-            vip_level: get_i64(&vip, &["vip_level", "level"]).unwrap_or(0),
-            vip_label: get_string(&vip, &["vip_name", "name"]),
+            nickname: get_string(&info, &["nick", "nickname"]),
+            avatar: upgrade_https(&get_string(&info, &["logo", "headpic", "avatar"])),
+            encrypt_uin: get_string(&info, &["encrypt_uin", "encryptUin"]),
+            vip_level: 0,
+            vip_label: String::new(),
         })
     }
     .await;
@@ -792,6 +797,16 @@ mod tests {
         assert_eq!(get_string(&value, &["musicid"]), "123");
         assert_eq!(get_string(&value, &["flag"]), "true");
         assert_eq!(get_string(&value, &["missing"]), "");
+    }
+
+    #[test]
+    fn upgrades_http_avatar() {
+        assert_eq!(
+            upgrade_https("http://thirdqq.qlogo.cn/g?b=sdk&k=abc&s=100"),
+            "https://thirdqq.qlogo.cn/g?b=sdk&k=abc&s=100"
+        );
+        assert_eq!(upgrade_https("https://y.gtimg.cn/x.jpg"), "https://y.gtimg.cn/x.jpg");
+        assert_eq!(upgrade_https(""), "");
     }
 
     #[test]

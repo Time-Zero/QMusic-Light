@@ -259,33 +259,34 @@ async function completeLogin(net, checkSigUrl) {
   return { account, credentials };
 }
 
-/** 用户资料：老 CGI，g_tk = hash33(musickey, 5381)（文档 §3.4） */
+/** QQ 头像常返回 http:// 链接，统一升级成 https，避免 WebView 混合内容拦截 */
+function httpsUrl(url) {
+  return url.startsWith('http://') ? `https://${url.slice(7)}` : url;
+}
+
+/**
+ * 用户资料：老 CGI fcg_get_profile_homepage.fcg 已下线（实测 200 空包），
+ * 改用 musicu 的 music.UserInfo.userInfoServer/GetLoginUserInfo（文档 §3.4）
+ */
 export async function fetchProfile(net, credentials) {
   try {
-    const gTk = hash33(credentials.musickey, 5381);
-    const query = new URLSearchParams({
-      userid: String(credentials.musicid),
-      g_tk: String(gTk),
-      format: 'json',
-      inCharset: 'utf8',
-      outCharset: 'utf-8',
-      notice: 0,
-      platform: 'yqq.json',
-      needNewCode: 0,
-    });
-    const url = `https://c6.y.qq.com/rsc/fcgi-bin/fcg_get_profile_homepage.fcg?${query.toString()}`;
-    const res = await net.requestWithRetry(url, {
-      headers: { Cookie: cookieHeaderFrom(credentials) },
+    const payload = {
+      comm: { ct: 24, cv: 4747474, uin: '0', format: 'json', tmeLoginType: 2 },
+      req_0: { module: 'music.UserInfo.userInfoServer', method: 'GetLoginUserInfo', param: {} },
+    };
+    const res = await net.request(APP_CONFIG.musicu, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookieHeaderFrom(credentials) },
+      body: JSON.stringify(payload),
     });
     const json = parseJsonLoose(await res.text());
-    const creator = json?.data?.creator ?? {};
-    const vip = creator.vip ?? {};
+    const info = json?.req_0?.data?.info ?? {};
     return {
-      nickname: creator.nick ?? creator.nickname ?? '',
-      avatar: creator.headpic ?? creator.avatar ?? '',
-      encryptUin: creator.encrypt_uin ?? creator.encryptUin ?? '',
-      vipLevel: Number(vip.vip_level ?? vip.level ?? 0) || 0,
-      vipLabel: vip.vip_name ?? vip.name ?? '',
+      nickname: info.nick ?? info.nickname ?? '',
+      avatar: httpsUrl(info.logo ?? info.headpic ?? info.avatar ?? ''),
+      encryptUin: info.encrypt_uin ?? info.encryptUin ?? '',
+      vipLevel: 0,
+      vipLabel: '',
     };
   } catch {
     return { nickname: '', avatar: '', encryptUin: '', vipLevel: 0, vipLabel: '' };
