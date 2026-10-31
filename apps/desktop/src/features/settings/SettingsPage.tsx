@@ -281,7 +281,7 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
-          <div className="setting-row">
+          <div className="setting-row sidebar-row">
             <span className="label">侧栏</span>
             <div className="seg">
               <button

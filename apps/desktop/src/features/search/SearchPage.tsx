@@ -18,6 +18,12 @@ import { useUiStore } from '@/shared/ui/ui-store';
 
 type Tab = 'songs' | 'playlists' | 'singers';
 
+const TABS: readonly Tab[] = ['songs', 'playlists', 'singers'];
+
+/** 只接受已知值：手改 URL 传 `?tab=xxx` 时退回单曲，不要让页面渲染出空分支 */
+const readTab = (value: string | null): Tab =>
+  value && (TABS as readonly string[]).includes(value) ? (value as Tab) : 'songs';
+
 export default function SearchPage() {
   const core = useCore();
   const navigate = useNavigate();
@@ -25,10 +31,11 @@ export default function SearchPage() {
   const setCrumb = useUiStore((s) => s.setCrumb);
   const [params, setParams] = useSearchParams();
   const urlQuery = params.get('q') ?? '';
+  // tab 放 URL：刷新 / 后退 / 从命令面板重进都能回到同一视图，与「我的音乐」保持一致
+  const tab = readTab(params.get('tab'));
 
   const [input, setInput] = useState(urlQuery);
   const [submitted, setSubmitted] = useState(urlQuery);
-  const [tab, setTab] = useState<Tab>('songs');
   const [focused, setFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -66,12 +73,22 @@ export default function SearchPage() {
     retry: 0,
   });
 
+  const setTab = (next: Tab) => {
+    const nextParams = new URLSearchParams(params);
+    if (next === 'songs') nextParams.delete('tab');
+    else nextParams.set('tab', next);
+    setParams(nextParams, { replace: true });
+  };
+
   const submit = (value: string) => {
     const keyword = value.trim();
     if (!keyword) return;
     setInput(keyword);
     setSubmitted(keyword);
-    setParams({ q: keyword }, { replace: true });
+    // 换关键词不动当前 tab（与改造前一致），只把 q 落进 URL
+    const nextParams = new URLSearchParams(params);
+    nextParams.set('q', keyword);
+    setParams(nextParams, { replace: true });
     setFocused(false);
     inputRef.current?.blur();
   };

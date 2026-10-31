@@ -54,7 +54,7 @@ export function TopBar() {
       </div>
 
       <div className="top-actions">
-        <button type="button" className="icon-btn" title="折叠侧栏" onClick={toggleSidebar}>
+        <button type="button" className="icon-btn collapse-btn" title="折叠侧栏" onClick={toggleSidebar}>
           <PanelLeft />
         </button>
         <button

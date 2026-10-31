@@ -1022,11 +1022,15 @@
   border-bottom: 0;
 }
 
+/* 标签永远一行说完，长取值（画质策略、后端名）自己换行，避免两侧互相挤断 */
 .setting-row .label {
+  flex: none;
+  white-space: nowrap;
   color: var(--text-secondary);
 }
 
 .setting-row .value {
+  min-width: 0;
   margin-left: auto;
   color: var(--text-tertiary);
   font-size: 11.5px;
@@ -1071,11 +1075,19 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 窄列（1101–1280）里三个 pill 会互相压扁，允许换行并整体右对齐 */
 .setting-row .setting-actions {
   display: flex;
+  flex: none;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--sp-2);
   margin-left: auto;
+}
+
+.setting-row .setting-actions .pill {
+  white-space: nowrap;
 }
 
 .setting-row .setting-dir-input {
@@ -1291,6 +1303,13 @@
   }
 }
 
+/* 设置卡片两列在 1024 附近每列只剩 366，"当前策略"这类长值会折成三行 */
+@media (max-width: 1100px) {
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 980px) {
   .np-body {
     grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.14fr);
@@ -1309,18 +1328,10 @@
     padding-inline: var(--sp-6);
     padding-bottom: clamp(12px, 2.4vh, 24px);
   }
-
-  .settings-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .queue-panel {
-    width: calc(100vw - var(--player-gap) * 2);
-  }
 }
 
 /* 窄窗：改为「小封面 + 信息」在上、歌词在下的单列结构 */
-@media (max-width: 820px) {
+@media (max-width: 900px) {
   .np-top {
     gap: var(--sp-2);
     padding-inline: var(--sp-4);
@@ -1381,94 +1392,10 @@
   .np-progress {
     padding-inline: var(--sp-4);
   }
-}
 
-@media (max-width: 560px) {
-  .np-top {
-    gap: 6px;
-  }
-
-  .np-top .np-title,
-  .np-top .playing-badge {
+  /* 侧栏在此宽度恒为图标栏，设置页里的展开/收起不再有效，一并收掉 */
+  .setting-row.sidebar-row {
     display: none;
-  }
-
-  .np-top .win-controls {
-    gap: 0;
-    margin-left: var(--sp-1);
-  }
-
-  .np-top .win-btn {
-    width: 34px;
-  }
-
-  .np-cover {
-    width: clamp(72px, 21vw, 100px);
-  }
-
-  .np-meta .kicker {
-    display: none;
-  }
-
-  .np-meta h1 {
-    font-size: 18px;
-  }
-
-  .np-meta .sub {
-    font-size: 11px;
-  }
-
-  .np-action {
-    gap: 5px;
-    height: 28px;
-    padding: 0 10px;
-    font-size: 11px;
-  }
-
-  .np-action svg {
-    width: 13px;
-    height: 13px;
-  }
-
-  .np-lyric-hint {
-    display: none;
-  }
-
-  .lyric-line {
-    font-size: 14.5px;
-  }
-
-  .np-progress .progress-row {
-    gap: 6px;
-  }
-
-  .np-progress .time {
-    width: 34px;
-    font-size: 10px;
-  }
-
-  .np-controls {
-    gap: 8px;
-  }
-
-  .np-controls .icon-btn {
-    width: 34px;
-    height: 34px;
-  }
-
-  .np-controls .icon-btn svg {
-    width: 18px;
-    height: 18px;
-  }
-
-  .np-controls .ctrl-main {
-    width: 46px;
-    height: 46px;
-  }
-
-  .np-controls .ctrl-main svg {
-    width: 18px;
-    height: 18px;
   }
 }
 
@@ -1490,8 +1417,9 @@
     margin-top: var(--sp-2);
   }
 
+  /* 矮窗的每一像素都要让给歌词：600 高时上下留白从 80 压到 24 */
   .np-lyric-track {
-    padding-block: clamp(24px, 14vh, 80px);
+    padding-block: clamp(12px, 4vh, 32px);
   }
 
   .np-progress {
@@ -1503,7 +1431,8 @@
   }
 }
 
-@media (max-height: 640px) and (min-width: 821px) {
+/* 只有双列（宽 ≥ 901）才用「按高度收缩封面」；单列时封面本就小，再按 36vh 放大反而挤掉歌词 */
+@media (max-height: 640px) and (min-width: 901px) {
   .np-cover {
     width: min(100%, 36vh, 300px);
   }

@@ -195,8 +195,12 @@
 }
 
 .side-label button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
   margin-left: auto;
-  padding: 0 4px;
+  padding: 0;
   border: 0;
   border-radius: var(--radius-xs);
   background: none;
@@ -464,8 +468,9 @@
   scroll-behavior: smooth;
 }
 
+/* 2560 级宽屏下 1280 会让两侧各空掉 500+，1440 是密度与行长都能接受的折中 */
 .content-body {
-  max-width: 1280px;
+  max-width: 1440px;
   margin: 0 auto;
 }
 
@@ -487,17 +492,7 @@
   }
 }
 
-@media (max-width: 1080px) {
-  .cards {
-    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-  }
-
-  .hero-aside {
-    display: none;
-  }
-}
-
-@media (max-width: 860px) {
+@media (max-width: 900px) {
   .app {
     grid-template-columns: var(--sidebar-w-min) minmax(0, 1fr);
   }
@@ -528,6 +523,11 @@
   }
 
   .top-actions .pill {
+    display: none;
+  }
+
+  /* 这个宽度下侧栏恒为图标栏（见上），折叠开关点了不会有反应，直接收掉 */
+  .top-actions .collapse-btn {
     display: none;
   }
 }

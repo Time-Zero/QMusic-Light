@@ -271,19 +271,52 @@
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * 窄窗（窗口最小宽起）的详情头：三件事必须同时做到，否则 900–1080 区间里
+ * 「封面 / 标题 / 右侧信息」会各自占一行，把首屏推到折叠线以下。
+ *   1. 右侧信息列让位（它的内容在 hero-meta 里已有等价信息）
+ *   2. 封面缩到 96，和正文并排，不再独占一行
+ *   3. 标题降到 28 + 正文允许收缩到 300，保证 cover + body 能同行
+ */
 @media (max-width: 1080px) {
   .hero {
     flex-wrap: wrap;
-    gap: var(--sp-6);
+    align-items: flex-start;
+    gap: var(--sp-4);
+    padding: var(--sp-6);
   }
 
+  .hero-aside,
   .hero-clips {
-    flex-basis: 100%;
-    max-width: none;
+    display: none;
+  }
+
+  .hero-cover {
+    width: 96px;
+    height: 96px;
+  }
+
+  .hero-body {
+    flex: 1 1 300px;
   }
 
   .hero h1 {
-    font-size: 34px;
+    margin-top: var(--sp-1);
+    font-size: 28px;
+  }
+
+  .hero-desc {
+    max-width: none;
+  }
+
+  .hero-actions {
+    flex-wrap: wrap;
+    margin-top: var(--sp-4);
+  }
+
+  /* 卡片列数随内容区收窄；用 .page 提升特异性，替掉原先的 !important */
+  .page .cards {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
@@ -830,10 +863,17 @@ html[data-window-focus='blurred'] .boot-loading span {
   display: grid;
   place-items: center;
   flex: none;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: 0;
+  border-radius: var(--radius-xs);
   background: none;
   color: var(--clay);
+}
+
+.now .like:hover {
+  background: var(--surface);
 }
 
 .now .like svg {
@@ -1094,4 +1134,30 @@ html[data-playing='true'] .bar .knob {
 .playing-badge svg {
   width: 11px;
   height: 11px;
+}
+
+/*
+ * 播放条窄窗：三列都是 minmax 的硬下限，窗口缩到 1000 以下时右列被内容撑破，
+ * 「主题」按钮被迫折成两行。这里把下限整体下调一档，并让音量条随宽度收缩。
+ */
+@media (max-width: 1000px) {
+  .player {
+    grid-template-columns: minmax(150px, 1fr) minmax(290px, 1.5fr) minmax(200px, 1fr);
+    gap: var(--sp-3);
+    padding: 0 var(--sp-3);
+  }
+
+  .right-controls {
+    min-width: 0;
+  }
+
+  .volume {
+    width: 64px;
+  }
+
+  .theme-toggle {
+    flex: none;
+    padding: 0 var(--sp-2);
+    white-space: nowrap;
+  }
 }

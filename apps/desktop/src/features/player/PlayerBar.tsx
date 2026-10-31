@@ -215,7 +215,7 @@ export function PlayerBar() {
             className="icon-btn"
             title={muted ? '取消静音' : '静音'}
             onClick={toggleMute}
-            style={{ width: 22, height: 22 }}
+            style={{ width: 24, height: 24 }}
           >
             {muted || volume === 0 ? <VolumeX /> : <Volume2 />}
           </button>
