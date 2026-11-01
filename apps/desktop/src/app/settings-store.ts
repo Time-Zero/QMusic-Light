@@ -13,6 +13,8 @@ interface SettingsState {
   quality: Quality;
   sidebarCollapsed: boolean;
   gridDensity: 'comfortable' | 'compact';
+  /** 桌面浮动歌词：真源是这个开关，窗口只是它的表现 */
+  desktopLyric: boolean;
 
   /** 以下字段的真源在 Rust（prefs.json）：关闭窗口时后端就要知道，等不到前端启动 */
   closeAction: CloseAction;
@@ -28,6 +30,7 @@ interface SettingsState {
   toggleTheme: () => void;
   setQuality: (quality: Quality) => void;
   toggleSidebar: () => void;
+  setDesktopLyric: (enabled: boolean) => void;
   /** 启动时从平台层取回偏好与占用 */
   hydrateShell: (value: ShellSettings) => void;
   updatePrefs: (patch: ShellPrefsPatch) => Promise<void>;
@@ -56,6 +59,7 @@ export const useSettingsStore = create<SettingsState>()(
       quality: '320',
       sidebarCollapsed: false,
       gridDensity: 'comfortable',
+      desktopLyric: false,
 
       closeAction: 'tray',
       minimizeToTray: true,
@@ -70,6 +74,7 @@ export const useSettingsStore = create<SettingsState>()(
       toggleTheme: () => set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),
       setQuality: (quality) => set({ quality }),
       toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+      setDesktopLyric: (desktopLyric) => set({ desktopLyric }),
 
       hydrateShell: (value) => set(shellFields(value)),
 
@@ -124,6 +129,8 @@ export const useSettingsStore = create<SettingsState>()(
         quality: state.quality,
         sidebarCollapsed: state.sidebarCollapsed,
         gridDensity: state.gridDensity,
+        // 上次离开时开着桌面歌词，下次启动按同一状态恢复
+        desktopLyric: state.desktopLyric,
       }),
       // 换了视觉系统：老用户的暗色偏好一次性回到花期白天
       migrate: (state) => ({ ...(state as object), theme: 'light' }) as SettingsState,

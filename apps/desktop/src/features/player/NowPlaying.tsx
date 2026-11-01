@@ -30,6 +30,7 @@ import { subscribeProgress } from '@/shared/lib/progress-driver';
 import { CoverImage } from '@/shared/ui/CoverImage';
 import { ProgressBar } from '@/shared/ui/ProgressBar';
 import { toast } from '@/shared/ui/ui-store';
+import { DesktopLyricButton } from './DesktopLyricButton';
 import { PlayModeButton } from './PlayModeButton';
 import { useCurrentSong, usePlayerStore } from './player-store';
 import { TrackTime } from './TrackTime';
@@ -234,6 +235,7 @@ export function NowPlaying({ closing = false }: { closing?: boolean }) {
         >
           <ListMusic />
         </button>
+        <DesktopLyricButton />
         <button
           type="button"
           className="icon-btn"

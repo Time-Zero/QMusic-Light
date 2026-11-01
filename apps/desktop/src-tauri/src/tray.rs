@@ -5,7 +5,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 /// 主窗口 label，与 `tauri.conf.json` 的 `windows[0].label` 一致。
-const MAIN_WINDOW: &str = "main";
+pub const MAIN_WINDOW: &str = "main";
 /// 冷启动竞态：连点两次 exe 时第二个进程可能抢在首实例窗口建好之前，短暂重试即可
 const ACTIVATE_RETRIES: usize = 10;
 const ACTIVATE_INTERVAL: Duration = Duration::from_millis(150);
@@ -30,9 +30,9 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .tooltip("QQ 音乐 Lite")
         .on_menu_event(|app, event| match event.id().as_ref() {
             "show" => show_main(app),
-            "play" => emit(app, "toggle"),
-            "prev" => emit(app, "prev"),
-            "next" => emit(app, "next"),
+            "play" => emit_action(app, "toggle"),
+            "prev" => emit_action(app, "prev"),
+            "next" => emit_action(app, "next"),
             "quit" => app.exit(0),
             _ => {}
         })
@@ -106,6 +106,7 @@ pub fn sync_tooltip<R: Runtime>(app: &AppHandle<R>, title: &str, playing: bool) 
     }
 }
 
-fn emit<R: Runtime>(app: &AppHandle<R>, action: &str) {
+/// 播放动作统一从这里下发：托盘菜单与桌面歌词浮窗共用同一条事件通道。
+pub fn emit_action<R: Runtime>(app: &AppHandle<R>, action: &str) {
     let _ = app.emit(ACTION_EVENT, serde_json::json!({ "action": action }));
 }

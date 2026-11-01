@@ -264,6 +264,44 @@ ol {
   color: var(--accent-text);
 }
 
+/*
+ * 桌面歌词开关。开 = 强调色 + 浮起底色 + 右上角亮点，关 = 与普通图标按钮无异。
+ * 播放栏与播放页共用同一套视觉，用户在任何一处点开，另一处也立刻是「开」。
+ */
+.lyric-toggle {
+  position: relative;
+}
+
+.lyric-toggle.is-on,
+.lyric-toggle.is-on:hover {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.lyric-toggle.is-on:hover {
+  background: color-mix(in oklab, var(--accent-soft) 72%, var(--accent));
+}
+
+.lyric-toggle-dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0;
+  transform: scale(0.4);
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+}
+
+.lyric-toggle.is-on .lyric-toggle-dot {
+  opacity: 1;
+  transform: none;
+}
+
 /* 不可见占位：让合并后的控制组左右对称，播放键仍居中 */
 .ctrl-spacer {
   visibility: hidden;

@@ -33,6 +33,35 @@ export const IS_TAURI =
   typeof window !== 'undefined' &&
   '__TAURI_INTERNALS__' in (window as unknown as Record<string, unknown>);
 
+/** 桌面歌词浮窗里的一行歌词（与 `LyricLine` 同构，跨 IPC 时不带 undefined） */
+export interface LyricLinePayload {
+  time: number;
+  text: string;
+  trans: string;
+}
+
+export interface LyricSongPayload {
+  name: string;
+  singers: string;
+  cover: string | null;
+}
+
+/**
+ * 桌面歌词快照。主窗口只推增量（换歌 / 换行 / 播放态），
+ * Rust 侧合并成完整快照再广播给歌词窗口，所以任何一边先起来都能对上。
+ */
+export interface LyricSnapshot {
+  song: LyricSongPayload | null;
+  lines: LyricLinePayload[];
+  /** 当前高亮行；-1 表示还没进第一句（或没有歌词） */
+  index: number;
+  playing: boolean;
+}
+
+export type LyricPatch = Partial<LyricSnapshot>;
+
+export type LyricAction = 'toggle' | 'prev' | 'next';
+
 function tauriCommandFor(path: string): string {
   // '/auth/qr_start' → 'auth.qr_start'，与 Node 平台层路由逐段对应
   return path.replace(/^\/+/, '').replace(/\//g, '.');
@@ -112,6 +141,18 @@ export const bridge = {
     pickDir: () => call<{ path: string | null }>('/app/pick_dir'),
     show: () => call<void>('/app/show'),
     quit: () => call<void>('/app/quit'),
+  },
+  /**
+   * 桌面浮动歌词：窗口由 Rust 侧创建与摆放，前端只负责开关与推快照。
+   * 同一个窗口在一生中只建一次，关掉只是隐藏，再开立刻接上当前句。
+   */
+  lyric: {
+    setEnabled: (enabled: boolean) => call<{ enabled: boolean }>('/lyric/set_enabled', { enabled }),
+    /** 歌词窗口挂载时补一次完整快照，避免首帧空白 */
+    snapshot: () => call<LyricSnapshot>('/lyric/snapshot'),
+    sync: (patch: LyricPatch) => call<LyricSnapshot>('/lyric/sync', patch as Record<string, unknown>),
+    action: (action: LyricAction) => call<void>('/lyric/action', { action }),
+    persistPos: (pos: { x: number; y: number }) => call<void>('/lyric/persist_pos', pos),
   },
   /** 整首音频缓存：命中即本地回放，网络波动不影响播放 */
   cache: {

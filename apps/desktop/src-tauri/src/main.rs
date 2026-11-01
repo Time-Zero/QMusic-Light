@@ -7,6 +7,7 @@ mod cookies;
 mod db;
 mod error;
 mod hash33;
+mod lyric;
 mod models;
 mod net;
 mod picker;
@@ -55,6 +56,17 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            // 桌面歌词浮窗不是主界面：关掉它只等于关掉歌词，
+            // 不能走「收进托盘」那条路，否则开关与窗口状态会打架。
+            if window.label() == lyric::LYRIC_WINDOW {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = window.hide();
+                    lyric::notify_disabled(window.app_handle());
+                }
+                return;
+            }
+
             let flags = window.try_state::<AppState>().map(|state| {
                 let prefs = state.prefs.get();
                 (

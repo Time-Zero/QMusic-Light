@@ -11,6 +11,13 @@ pub const MIN_CACHE_BYTES: u64 = 128 * 1024 * 1024;
 pub const MAX_CACHE_BYTES: u64 = 64 * 1024 * 1024 * 1024;
 pub const DEFAULT_CACHE_BYTES: u64 = 1024 * 1024 * 1024;
 
+/// 桌面歌词浮窗上一次的落点（物理像素）。换屏后由 lyric 模块重新夹取。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LyricPos {
+    pub x: i32,
+    pub y: i32,
+}
+
 /// 平台侧偏好：窗口关闭行为（启动即需要，因此不能只放在前端 localStorage）与播放缓存配置。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -26,6 +33,9 @@ pub struct Prefs {
     pub cache_dir: Option<String>,
     #[serde(default = "default_cache_bytes")]
     pub cache_max_bytes: u64,
+    /// 桌面歌词浮窗位置；None 表示还没被用户拖过
+    #[serde(default)]
+    pub lyric_pos: Option<LyricPos>,
 }
 
 impl Default for Prefs {
@@ -36,6 +46,7 @@ impl Default for Prefs {
             stream_cache: true,
             cache_dir: None,
             cache_max_bytes: DEFAULT_CACHE_BYTES,
+            lyric_pos: None,
         }
     }
 }
@@ -68,6 +79,11 @@ impl Prefs {
             } else {
                 Some(trimmed)
             }
+        });
+        // 明显离谱的坐标（手改文件 / 溢出）直接丢掉，交给默认摆位。
+        // 用区间判断而不是 abs()：i32::MIN 取绝对值会溢出。
+        self.lyric_pos = self.lyric_pos.filter(|pos| {
+            (-100_000..100_000).contains(&pos.x) && (-100_000..100_000).contains(&pos.y)
         });
         self
     }
@@ -147,12 +163,17 @@ mod tests {
             close_action: "explode".into(),
             cache_max_bytes: 1,
             cache_dir: Some("   ".into()),
+            lyric_pos: Some(LyricPos {
+                x: 9_999_999,
+                y: 0,
+            }),
             ..Default::default()
         }
         .normalized();
         assert_eq!(prefs.close_action, "tray");
         assert_eq!(prefs.cache_max_bytes, MIN_CACHE_BYTES);
         assert!(prefs.cache_dir.is_none());
+        assert!(prefs.lyric_pos.is_none());
     }
 
     #[test]

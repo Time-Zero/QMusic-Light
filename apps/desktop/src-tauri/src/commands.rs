@@ -7,6 +7,7 @@ use crate::auth;
 use crate::cache;
 use crate::db;
 use crate::error::{PResult, PlatformError};
+use crate::lyric;
 use crate::picker;
 use crate::qq_api;
 use crate::state::AppState;
@@ -89,6 +90,19 @@ async fn dispatch(app: &AppHandle, state: &AppState, command: &str, args: &Value
             app.exit(0);
             Ok(json!({}))
         }
+        // 桌面歌词：开关 / 快照补读 / 增量同步 / 浮窗上的播放控制 / 位置记忆
+        "lyric.set_enabled" => {
+            let enabled = args.get("enabled").and_then(Value::as_bool).unwrap_or(false);
+            lyric::set_enabled(app, state, enabled)
+        }
+        "lyric.snapshot" => Ok(state.lyric.snapshot()),
+        "lyric.sync" => Ok(lyric::sync(app, state, args)),
+        "lyric.action" => {
+            let action = arg_str(args, "action")?;
+            lyric::dispatch_action(app, &action);
+            Ok(json!({}))
+        }
+        "lyric.persist_pos" => lyric::persist_pos(state, args),
         "cache.get" => {
             let key = arg_str(args, "key")?;
             let ext = arg_str(args, "ext")?;

@@ -21,6 +21,7 @@ import { coverVars } from '@/shared/lib/color';
 import { formatDuration, singerNames } from '@/shared/lib/format';
 import { CoverImage } from '@/shared/ui/CoverImage';
 import { ProgressBar } from '@/shared/ui/ProgressBar';
+import { DesktopLyricButton } from './DesktopLyricButton';
 import { PlayModeButton } from './PlayModeButton';
 import { useCurrentSong, usePlayerStore } from './player-store';
 import { TrackTime } from './TrackTime';
@@ -134,10 +135,11 @@ export function PlayerBar() {
           <ListMusic />
           {queueLength > 0 ? <span className="badge">{queueLength > 99 ? '99+' : queueLength}</span> : null}
         </button>
+        <DesktopLyricButton />
         <button
           type="button"
           className="icon-btn"
-          title="歌词"
+          title="播放页歌词"
           onClick={() => song && setShowNowPlaying(true)}
           disabled={!song}
         >
@@ -182,7 +184,7 @@ export function PlayerBar() {
 
         <button type="button" className="theme-toggle" title="切换主题" onClick={toggleTheme}>
           {theme === 'dark' ? <Moon /> : <Sun />}
-          主题
+          <span className="theme-label">主题</span>
         </button>
       </div>
     </footer>

@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "默认窗口能力：core 与自定义 ipc 命令；标题栏由页面自绘，需要窗口拖动与按钮权限",
-  "windows": ["main"],
+  "description": "默认窗口能力：core 与自定义 ipc 命令；标题栏与桌面歌词浮窗都自绘，需要窗口拖动与按钮权限",
+  "windows": ["main", "lyric"],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",

@@ -1240,4 +1240,10 @@ html[data-playing='true'] .bar .knob {
     padding: 0 var(--sp-2);
     white-space: nowrap;
   }
+
+  /* 右列多出桌面歌词开关后，900px 宽时只剩几个像素余量：
+     这里把「主题」二字收进图标，给图标按钮留出呼吸空间 */
+  .theme-toggle .theme-label {
+    display: none;
+  }
 }

@@ -12,6 +12,7 @@ use uuid::Uuid;
 use crate::cache::StreamCache;
 use crate::db;
 use crate::error::{PResult, PlatformError};
+use crate::lyric::DesktopLyric;
 use crate::models::{account_from_credentials, Account, Credentials};
 use crate::net::Net;
 use crate::prefs::PrefStore;
@@ -40,6 +41,8 @@ pub struct AppState {
     pub prefs: PrefStore,
     /// 整首音频缓存
     pub cache: StreamCache,
+    /// 桌面歌词浮窗的最新快照（主窗口推增量，歌词窗口按需补读）
+    pub lyric: DesktopLyric,
     pub secret: SecretStore,
     pub credentials: RwLock<Option<Credentials>>,
     pub account: RwLock<Option<Account>>,
@@ -75,6 +78,7 @@ impl AppState {
             db: Mutex::new(connection),
             prefs,
             cache,
+            lyric: DesktopLyric::new(),
             secret,
             credentials: RwLock::new(credentials),
             account: RwLock::new(account),

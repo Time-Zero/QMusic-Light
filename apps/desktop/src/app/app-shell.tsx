@@ -5,6 +5,7 @@ import { NowPlaying } from '@/features/player/NowPlaying';
 import { PlayerBar } from '@/features/player/PlayerBar';
 import { QueuePanel } from '@/features/player/QueuePanel';
 import { usePlayerStore } from '@/features/player/player-store';
+import { useDesktopLyric } from '@/features/player/use-desktop-lyric';
 import { useShellBridge } from '@/features/player/use-shell-bridge';
 import { Sidebar } from '@/shared/components/Sidebar';
 import { TopBar } from '@/shared/components/TopBar';
@@ -21,6 +22,8 @@ export function AppShell() {
 
   useGlobalHotkeys();
   useShellBridge();
+  // 桌面歌词浮窗的唯一数据源：换歌 / 换行 / 播放态都从这里推过去
+  useDesktopLyric();
 
   const nowPlaying = usePresence(showNowPlaying);
   const queue = usePresence(showQueue);
