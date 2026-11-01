@@ -15,8 +15,11 @@ mod prefs;
 mod protocol;
 mod qq_api;
 mod secret;
+mod snapshot;
 mod state;
+mod taskbar;
 mod tray;
+mod webview;
 
 use tauri::Manager;
 
@@ -53,9 +56,21 @@ fn main() {
             };
             state.set_tray_ready(tray_ready);
             app.manage(state);
+
+            // 任务栏面板跟着偏好恢复。窗口建好也不会立刻露面：有歌在播才显示。
+            // 建不起来（非 Windows / Explorer 还没起来）只记一笔，不影响主界面。
+            if let Err(error) = taskbar::restore(app.handle()) {
+                eprintln!("任务栏面板初始化失败：{error}");
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
+            // 任务栏面板没有标题栏，也不参与「关闭收进托盘」：
+            // 它的存亡只由偏好开关与任务栏状态决定，走通用逻辑会被藏成一个幽灵窗口
+            if window.label() == taskbar::TASKBAR_WINDOW {
+                return;
+            }
+
             // 桌面歌词浮窗不是主界面：关掉它只等于关掉歌词，
             // 不能走「收进托盘」那条路，否则开关与窗口状态会打架。
             if window.label() == lyric::LYRIC_WINDOW {

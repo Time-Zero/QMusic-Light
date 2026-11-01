@@ -49,6 +49,7 @@ export default function SettingsPage() {
   const cacheFileCount = useSettingsStore((s) => s.cacheFileCount);
   const closeAction = useSettingsStore((s) => s.closeAction);
   const minimizeToTray = useSettingsStore((s) => s.minimizeToTray);
+  const taskbarPanel = useSettingsStore((s) => s.taskbarPanel);
   const updatePrefs = useSettingsStore((s) => s.updatePrefs);
   const refreshCacheStats = useSettingsStore((s) => s.refreshCacheStats);
   const clearStreamCache = useSettingsStore((s) => s.clearStreamCache);
@@ -508,11 +509,31 @@ export default function SettingsPage() {
             </div>
           </div>
           <div className="setting-row">
+            <span className="label">任务栏播放控制</span>
+            <div className="seg">
+              <button
+                type="button"
+                className={cn(taskbarPanel && 'active')}
+                onClick={() => void updatePrefs({ taskbarPanel: true })}
+              >
+                显示
+              </button>
+              <button
+                type="button"
+                className={cn(!taskbarPanel && 'active')}
+                onClick={() => void updatePrefs({ taskbarPanel: false })}
+              >
+                隐藏
+              </button>
+            </div>
+          </div>
+          <div className="setting-row">
             <span className="label">托盘菜单</span>
             <span className="value">显示主界面 / 播放暂停 / 上一首 / 下一首 / 退出</span>
           </div>
           <p className="muted" style={{ marginTop: 10, fontSize: 11, lineHeight: 1.7 }}>
             收进托盘后窗口隐藏但播放继续；需要彻底退出请用托盘菜单里的「退出」，或把点击关闭改成直接退出。
+            任务栏面板只在 Windows 上出现，贴住通知区域左侧，有歌在播时才显示。
           </p>
         </section>
 

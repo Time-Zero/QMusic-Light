@@ -56,8 +56,9 @@ export function extractPalette(src: string, seed: string): Promise<{ c1: string;
   if (!src) return Promise.resolve(fallback);
   return new Promise((resolve) => {
     const img = new Image();
-    // 只取 16×16 的平均色，没必要为了让 CDN 给原图而多占一张解码位图
-    const sample = coverAtSize(src, 96);
+    // 只取 16×16 的平均色，没必要为了让 CDN 给原图而多占一张解码位图。
+    // 尺寸模板只认少数几档，96 会 404（而且这里失败是静默的），取 150
+    const sample = coverAtSize(src, 150);
     // 不设置 crossOrigin：CDN 未返回 CORS 头时 canvas 会被标记为 tainted，
     // getImageData 抛错后回退到哈希渐变，避免控制台噪音。
     img.decoding = 'async';

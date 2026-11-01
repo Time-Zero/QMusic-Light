@@ -60,7 +60,37 @@ export interface LyricSnapshot {
 
 export type LyricPatch = Partial<LyricSnapshot>;
 
-export type LyricAction = 'toggle' | 'prev' | 'next';
+/** 播放控制动作：托盘、桌面歌词、任务栏面板共用同一条原生通道 */
+export type PlaybackAction = 'toggle' | 'prev' | 'next';
+export type LyricAction = PlaybackAction;
+
+/** 任务栏面板里的当前曲目：只要封面，不要歌词 */
+export interface TaskbarSongPayload {
+  name: string;
+  singers: string;
+  cover: string | null;
+}
+
+/**
+ * 任务栏面板的排布参数，全部由平台侧按任务栏实测尺寸下发：
+ * `h` 是胶囊高度（所有控件按它等比缩放），`pad` 是窗口四周给投影留的空白，
+ * `axis` 决定胶囊横排还是竖排（任务栏停靠在屏幕左右两侧时竖过来）。
+ */
+export interface TaskbarLayout {
+  h: number;
+  pad: number;
+  axis: 'horizontal' | 'vertical';
+  /** 跟随 Windows 的明暗模式，而不是应用内主题 */
+  theme: 'light' | 'dark';
+}
+
+export interface TaskbarSnapshot {
+  song: TaskbarSongPayload | null;
+  playing: boolean;
+  layout: TaskbarLayout;
+}
+
+export type TaskbarPatch = Partial<Pick<TaskbarSnapshot, 'song' | 'playing'>>;
 
 function tauriCommandFor(path: string): string {
   // '/auth/qr_start' → 'auth.qr_start'，与 Node 平台层路由逐段对应
@@ -154,6 +184,20 @@ export const bridge = {
     action: (action: LyricAction) => call<void>('/lyric/action', { action }),
     persistPos: (pos: { x: number; y: number }) => call<void>('/lyric/persist_pos', pos),
   },
+  /**
+   * 任务栏播放控制面板：窗口由平台侧创建、定位、跟随任务栏，
+   * 前端只推「封面 + 播放态」，并在画完第一帧后报到（`ready`）让窗口露面。
+   */
+  taskbar: {
+    /** 面板挂载时补读一次：播放态 + 当前任务栏比例 */
+    snapshot: () => call<TaskbarSnapshot>('/taskbar/snapshot'),
+    sync: (patch: TaskbarPatch) => call<void>('/taskbar/sync', patch as Record<string, unknown>),
+    /** 首帧已就绪：平台侧此时才把窗口显示出来，避免白底 / 错主题闪一下 */
+    ready: () => call<void>('/taskbar/ready'),
+    action: (action: PlaybackAction) => call<void>('/taskbar/action', { action }),
+    /** 点封面回主界面：面板贴在任务栏上，点封面就是想把它叫回来 */
+    focusMain: () => call<void>('/taskbar/focus_main'),
+  },
   /** 整首音频缓存：命中即本地回放，网络波动不影响播放 */
   cache: {
     get: (key: string, ext: string) => call<CachedStream | null>('/cache/get', { key, ext }),
@@ -180,5 +224,8 @@ export type BridgeAccount = Account;
 
 /** 可写偏好：占用统计等派生字段由平台层返回，不接受前端写入 */
 export type ShellPrefsPatch = Partial<
-  Pick<ShellSettings, 'closeAction' | 'minimizeToTray' | 'streamCache' | 'cacheDir' | 'cacheMaxBytes'>
+  Pick<
+    ShellSettings,
+    'closeAction' | 'minimizeToTray' | 'taskbarPanel' | 'streamCache' | 'cacheDir' | 'cacheMaxBytes'
+  >
 >;

@@ -463,9 +463,10 @@ function updateMediaSession(song: Song) {
       title: song.name,
       artist: song.singers.map((s) => s.name).join(' / '),
       album: song.albumName,
-      // 系统媒体浮窗只画几十像素，按 300×300 传图等于每次切歌多解一张 360 KB 的位图
+      // 系统媒体浮窗只画几十像素，按 300×300 传图等于每次切歌多解一张 360 KB 的位图。
+      // 尺寸模板只认少数几档，96 会 404，取最接近的 150
       artwork: song.cover
-        ? [{ src: coverAtSize(song.cover, 96), sizes: '96x96', type: 'image/jpeg' }]
+        ? [{ src: coverAtSize(song.cover, 150), sizes: '150x150', type: 'image/jpeg' }]
         : [],
     });
     navigator.mediaSession.setActionHandler('play', () => void usePlayerStore.getState().toggle());

@@ -19,6 +19,8 @@ interface SettingsState {
   /** 以下字段的真源在 Rust（prefs.json）：关闭窗口时后端就要知道，等不到前端启动 */
   closeAction: CloseAction;
   minimizeToTray: boolean;
+  /** 任务栏播放控制面板（Windows）。窗口归平台侧管，这里只做开关 */
+  taskbarPanel: boolean;
   streamCache: boolean;
   cacheDir: string;
   defaultCacheDir: string;
@@ -42,6 +44,7 @@ function shellFields(value: ShellSettings): Partial<SettingsState> {
   return {
     closeAction: value.closeAction,
     minimizeToTray: value.minimizeToTray,
+    taskbarPanel: value.taskbarPanel,
     streamCache: value.streamCache,
     cacheDir: value.cacheDir,
     defaultCacheDir: value.defaultCacheDir,
@@ -63,6 +66,7 @@ export const useSettingsStore = create<SettingsState>()(
 
       closeAction: 'tray',
       minimizeToTray: true,
+      taskbarPanel: true,
       streamCache: true,
       cacheDir: '',
       defaultCacheDir: '',

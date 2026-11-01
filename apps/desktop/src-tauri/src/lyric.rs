@@ -5,7 +5,6 @@
 //! 歌词窗口挂载时补一次，因此不依赖「主窗口先起来还是歌词窗口先起来」。
 
 use std::path::PathBuf;
-use std::sync::Mutex;
 use std::time::Duration;
 
 use serde_json::{json, Value};
@@ -17,6 +16,7 @@ use tauri::{
 use crate::error::{PResult, PlatformError};
 use crate::prefs::LyricPos;
 use crate::state::AppState;
+use crate::webview;
 
 /// 歌词窗口 label。能力文件（capabilities）里必须同时列出，
 /// 否则拖拽这类窗口 API 会在歌词窗口里被权限系统拒掉。
@@ -39,45 +39,8 @@ const EDGE_GAP: i32 = 76;
 /// 下次打开再按需重建 —— 快照存在 Rust 侧，重建后照样立刻接上当前句。
 const IDLE_RELEASE: Duration = Duration::from_secs(300);
 
-/// 快照存储。键与前端 `LyricSnapshot` 一一对应，patch 里没出现的键保持原值。
-#[derive(Default)]
-pub struct DesktopLyric {
-    snapshot: Mutex<Value>,
-}
-
-impl DesktopLyric {
-    pub fn new() -> Self {
-        Self {
-            snapshot: Mutex::new(empty_snapshot()),
-        }
-    }
-
-    pub fn snapshot(&self) -> Value {
-        self.snapshot
-            .lock()
-            .map(|guard| guard.clone())
-            .unwrap_or_else(|_| empty_snapshot())
-    }
-
-    /// 合并增量。`null` 是合法值（例如清空当前曲目），所以只按「键是否出现」判断。
-    fn merge(&self, patch: &Value) -> Value {
-        let Some(patch) = patch.as_object() else {
-            return self.snapshot();
-        };
-        let mut guard = match self.snapshot.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        if let Some(target) = guard.as_object_mut() {
-            for (key, value) in patch {
-                target.insert(key.clone(), value.clone());
-            }
-        }
-        guard.clone()
-    }
-}
-
-fn empty_snapshot() -> Value {
+/// 快照初始值。键与前端 `LyricSnapshot` 一一对应，patch 里没出现的键保持原值。
+pub fn empty_snapshot() -> Value {
     json!({ "song": Value::Null, "lines": [], "index": -1, "playing": false })
 }
 
@@ -163,7 +126,7 @@ fn ensure_window<R: Runtime>(app: &AppHandle<R>) -> PResult<(WebviewWindow<R>, b
         return Ok((window, false));
     }
 
-    let window = WebviewWindowBuilder::new(
+    let mut builder = WebviewWindowBuilder::new(
         app,
         LYRIC_WINDOW,
         WebviewUrl::App(PathBuf::from("index.html?window=lyric")),
@@ -186,9 +149,16 @@ fn ensure_window<R: Runtime>(app: &AppHandle<R>) -> PResult<(WebviewWindow<R>, b
         if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
             let _ = window.show();
         }
-    })
-    .build()
-    .map_err(|error| PlatformError::msg(format!("无法创建桌面歌词窗口：{error}")))?;
+    });
+
+    // 与主窗口共用同一个 WebView2 浏览器进程：环境参数不一致会 ERROR_INVALID_STATE
+    if let Some(args) = webview::shared_args(app) {
+        builder = builder.additional_browser_args(&args);
+    }
+
+    let window = builder
+        .build()
+        .map_err(|error| PlatformError::msg(format!("无法创建桌面歌词窗口：{error}")))?;
 
     Ok((window, true))
 }

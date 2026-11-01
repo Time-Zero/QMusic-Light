@@ -36,6 +36,9 @@ pub struct Prefs {
     /// 桌面歌词浮窗位置；None 表示还没被用户拖过
     #[serde(default)]
     pub lyric_pos: Option<LyricPos>,
+    /// 任务栏播放控制面板：窗口由平台侧托管，开关必须启动时就读得到
+    #[serde(default = "default_true")]
+    pub taskbar_panel: bool,
 }
 
 impl Default for Prefs {
@@ -47,6 +50,7 @@ impl Default for Prefs {
             cache_dir: None,
             cache_max_bytes: DEFAULT_CACHE_BYTES,
             lyric_pos: None,
+            taskbar_panel: true,
         }
     }
 }

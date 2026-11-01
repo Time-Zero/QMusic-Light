@@ -7,6 +7,7 @@ import { QueuePanel } from '@/features/player/QueuePanel';
 import { usePlayerStore } from '@/features/player/player-store';
 import { useDesktopLyric } from '@/features/player/use-desktop-lyric';
 import { useShellBridge } from '@/features/player/use-shell-bridge';
+import { useTaskbarPanel } from '@/features/taskbar/use-taskbar-panel';
 import { Sidebar } from '@/shared/components/Sidebar';
 import { TopBar } from '@/shared/components/TopBar';
 import { useGlobalHotkeys } from '@/shared/hooks/useGlobalHotkeys';
@@ -24,6 +25,8 @@ export function AppShell() {
   useShellBridge();
   // 桌面歌词浮窗的唯一数据源：换歌 / 换行 / 播放态都从这里推过去
   useDesktopLyric();
+  // 任务栏面板只要封面与播放态，换歌 / 暂停时推一次就够
+  useTaskbarPanel();
 
   const nowPlaying = usePresence(showNowPlaying);
   const queue = usePresence(showQueue);

@@ -35,8 +35,15 @@ tauri-plugin-single-instance = { version = "2", features = ["semver"] }
 custom-protocol = ["tauri/custom-protocol"]
 
 [target.'cfg(windows)'.dependencies]
-# 原生文件夹选择器（IFileOpenDialog）：crate 已在依赖树里，开启对应 feature 即可，不额外引入插件
-windows = { version = "0.62", features = ["Win32_Foundation", "Win32_System_Com", "Win32_UI_Shell"] }
+# 原生文件夹选择器（IFileOpenDialog）+ 任务栏面板（找 Shell_TrayWnd / 读系统主题 / 改扩展样式）：
+# crate 已在依赖树里，开启对应 feature 即可，不额外引入插件
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_System_Registry",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
 
 [dev-dependencies]
 tempfile = "3"

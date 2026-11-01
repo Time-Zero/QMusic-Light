@@ -225,6 +225,8 @@ export interface ShellSettings {
   closeAction: CloseAction;
   /** 最小化窗口也收进托盘 */
   minimizeToTray: boolean;
+  /** 任务栏播放控制面板（Windows）：窗口由平台侧托管 */
+  taskbarPanel: boolean;
   /** 播放时把整首音频缓存到本机 */
   streamCache: boolean;
   /** 当前生效的缓存目录 */

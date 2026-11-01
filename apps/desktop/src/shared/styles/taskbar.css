@@ -1,0 +1,235 @@
+/*
+ * 任务栏播放控制面板。
+ *
+ * 窗口是「无边框 + 透明 + 置顶 + 永不激活」的原生小窗，贴在任务栏通知区域左侧。
+ * 这里只画一枚胶囊：圆形封面 · 上一首 · 播放/暂停 · 下一首。
+ *
+ * 所有控件都由 --tb-h（胶囊高度，平台侧按任务栏实测厚度下发）等比推出，
+ * 比例与 Rust 侧 taskbar.rs 逐项对应：
+ *
+ *   封面 0.72H   两侧按钮 0.60H   播放键 0.80H
+ *   控件间距 0.12H   左右内边距 0.22H
+ *
+ * 四项控件 + 三道间距 + 两侧内边距 = 3.52H，宽高比恒为 3.52 : 1；
+ * 圆角取半高（`999px` 会被夹到半高），两端是完整半圆，整体即一枚椭圆胶囊。
+ * 任务栏停靠在屏幕左右两侧时平台侧下发 data-axis='vertical'，胶囊整体竖过来。
+ */
+
+html[data-window='taskbar'],
+html[data-window='taskbar'] body,
+html[data-window='taskbar'] #root {
+  height: 100%;
+  /* index.html 给 <html> 写了纸面色，透明窗口里必须覆盖掉 */
+  background: transparent !important;
+}
+
+html[data-window='taskbar'] body {
+  overflow: hidden;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 窗口比胶囊大一圈：四周留白给投影，鼠标在这圈里点不到东西（也没有东西可点） */
+.tb-root {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  padding: var(--tb-pad, 5px);
+}
+
+.tb-root[data-axis='vertical'] {
+  flex-direction: column;
+}
+
+.tb {
+  --tb-gap: calc(var(--tb-h, 32px) * 0.12);
+  --tb-inset: calc(var(--tb-h, 32px) * 0.22);
+
+  position: relative;
+  /* 悬停蒙版用负 z-index 压在控件下面，隔离出来才不会跑到窗口背景后面 */
+  isolation: isolate;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tb-gap);
+  min-width: 0;
+  padding-inline: var(--tb-inset);
+  /* 半径 = 半高：两端是完整半圆，整体即一枚椭圆胶囊 */
+  border-radius: 999px;
+  color: oklch(94% 0.01 74);
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+/* 竖排任务栏：内边距换到上下，间距自动变成纵向 */
+.tb-root[data-axis='vertical'] .tb {
+  flex-direction: column;
+  padding-inline: 0;
+  padding-block: var(--tb-inset);
+}
+
+/* ---------- 悬停：同一材料整体提亮一档，不换配色 ---------- */
+
+.tb::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.tb:hover::before {
+  opacity: 0.07;
+}
+
+/* ---------- 封面 ---------- */
+
+/* 封面同时是「回主界面」的按钮：点它和点托盘图标走同一条唤醒路径 */
+.tb-cover {
+  display: grid;
+  place-items: center;
+  flex: none;
+  inline-size: calc(var(--tb-h, 32px) * 0.72);
+  block-size: calc(var(--tb-h, 32px) * 0.72);
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  /* 没有封面 / 封面加载失败时的底：和列表里的占位同一套材料 */
+  background: linear-gradient(140deg, var(--cover-a), var(--cover-b));
+  color: oklch(98% 0.008 72 / 0.92);
+  box-shadow:
+    inset 0 0 0 1px oklch(100% 0 0 / 0.16),
+    0 1px 3px oklch(0% 0 0 / 0.32);
+  transition:
+    filter var(--dur-fast) var(--ease-out),
+    transform var(--dur-press) var(--ease-out);
+}
+
+.tb-cover:hover {
+  filter: brightness(1.12);
+}
+
+.tb-cover:active {
+  transform: scale(0.94);
+}
+
+.tb-cover:focus-visible {
+  outline: 2px solid var(--clay);
+  outline-offset: 1px;
+}
+
+.tb-cover-img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.tb-cover-icon {
+  inline-size: 40%;
+  block-size: 40%;
+}
+
+/* ---------- 控制按钮 ---------- */
+
+.tb-btn {
+  display: grid;
+  place-items: center;
+  flex: none;
+  inline-size: calc(var(--tb-h, 32px) * 0.6);
+  block-size: calc(var(--tb-h, 32px) * 0.6);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  opacity: 0.7;
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out),
+    transform var(--dur-press) var(--ease-out);
+}
+
+.tb-btn:hover {
+  opacity: 1;
+  background: color-mix(in oklab, currentColor 14%, transparent);
+}
+
+/* 按下去缩一格：任务栏上的小控件，触感比颜色更直接 */
+.tb-btn:active {
+  transform: scale(0.88);
+}
+
+.tb-btn:focus-visible {
+  outline: 2px solid var(--clay);
+  outline-offset: -1px;
+}
+
+.tb-btn svg {
+  inline-size: calc(var(--tb-h, 32px) * 0.32);
+  block-size: calc(var(--tb-h, 32px) * 0.32);
+}
+
+/* 播放键是唯一的实心控制：比两侧大一圈、填陶土色，一眼找到主操作 */
+.tb-play {
+  inline-size: calc(var(--tb-h, 32px) * 0.8);
+  block-size: calc(var(--tb-h, 32px) * 0.8);
+  background: var(--clay);
+  color: var(--clay-ink);
+  opacity: 1;
+  box-shadow: 0 2px 6px -2px oklch(0% 0 0 / 0.45);
+}
+
+.tb-play:hover {
+  background: var(--clay-hi);
+  color: var(--clay-ink);
+}
+
+.tb-play:active {
+  transform: scale(0.92);
+}
+
+.tb-play svg {
+  inline-size: calc(var(--tb-h, 32px) * 0.34);
+  block-size: calc(var(--tb-h, 32px) * 0.34);
+}
+
+/* ---------- 明暗：跟 Windows 的任务栏走 ---------- */
+
+:root[data-theme='dark'] .tb {
+  background: oklch(21% 0.014 62 / 0.84);
+  box-shadow:
+    inset 0 0 0 1px oklch(100% 0 0 / 0.1),
+    inset 0 1px 0 oklch(100% 0 0 / 0.06),
+    0 8px 18px -10px oklch(0% 0 0 / 0.72);
+}
+
+:root[data-theme='light'] .tb {
+  color: oklch(30% 0.02 46);
+  background: oklch(100% 0 0 / 0.88);
+  box-shadow:
+    inset 0 0 0 1px oklch(0% 0 0 / 0.07),
+    0 6px 16px -10px oklch(0% 0 0 / 0.38);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tb,
+  .tb::before,
+  .tb-btn,
+  .tb-cover {
+    transition: none;
+  }
+
+  .tb-btn:active,
+  .tb-play:active,
+  .tb-cover:active {
+    transform: none;
+  }
+}

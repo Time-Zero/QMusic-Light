@@ -11,6 +11,7 @@ use crate::lyric;
 use crate::picker;
 use crate::qq_api;
 use crate::state::AppState;
+use crate::taskbar;
 use crate::tray;
 
 /// 单一 IPC 命令，内部按文档 §5.3 的点号命令名分发。
@@ -66,8 +67,13 @@ async fn dispatch(app: &AppHandle, state: &AppState, command: &str, args: &Value
         })),
         "app.settings" => Ok(settings_json(state)),
         "app.prefs_update" => {
-            // 先按补丁算出新偏好并验证副作用（缓存目录能否创建），再落盘
+            // 先按补丁算出新偏好并验证副作用（缓存目录能否创建、任务栏面板能否建起来），
+            // 全部通过才落盘；任何一步失败都不会留下「开关说开着、窗口却不在」的状态
+            let current = state.prefs.get();
             let next = state.prefs.preview(args)?;
+            if next.taskbar_panel != current.taskbar_panel {
+                taskbar::apply_enabled(app, next.taskbar_panel)?;
+            }
             state
                 .cache
                 .set_dir(next.cache_dir.as_ref().map(PathBuf::from))?;
@@ -95,7 +101,7 @@ async fn dispatch(app: &AppHandle, state: &AppState, command: &str, args: &Value
             let enabled = args.get("enabled").and_then(Value::as_bool).unwrap_or(false);
             lyric::set_enabled(app, state, enabled)
         }
-        "lyric.snapshot" => Ok(state.lyric.snapshot()),
+        "lyric.snapshot" => Ok(state.lyric.get()),
         "lyric.sync" => Ok(lyric::sync(app, state, args)),
         "lyric.action" => {
             let action = arg_str(args, "action")?;
@@ -103,6 +109,24 @@ async fn dispatch(app: &AppHandle, state: &AppState, command: &str, args: &Value
             Ok(json!({}))
         }
         "lyric.persist_pos" => lyric::persist_pos(state, args),
+        // 任务栏播放控制面板：与桌面歌词同构，但只关心封面与播放态
+        "taskbar.snapshot" => Ok(taskbar::snapshot_json(app, state)),
+        "taskbar.sync" => Ok(taskbar::sync(app, state, args)),
+        "taskbar.ready" => {
+            taskbar::mark_ready(app);
+            Ok(json!({}))
+        }
+        "taskbar.action" => {
+            let action = arg_str(args, "action")?;
+            taskbar::dispatch_action(app, &action);
+            Ok(json!({}))
+        }
+        "taskbar.focus_main" => {
+            // 点封面回主界面：和托盘图标、二次启动走同一条唤醒路径，
+            // 「最小化 / 收进托盘 / 被别的窗口盖住」三种情况都在那里统一处理
+            tray::show_main(app);
+            Ok(json!({}))
+        }
         "cache.get" => {
             let key = arg_str(args, "key")?;
             let ext = arg_str(args, "ext")?;
@@ -151,6 +175,7 @@ fn settings_json(state: &AppState) -> Value {
     json!({
         "closeAction": prefs.close_action,
         "minimizeToTray": prefs.minimize_to_tray,
+        "taskbarPanel": prefs.taskbar_panel,
         "streamCache": prefs.stream_cache,
         "cacheDir": stats.dir,
         "defaultCacheDir": stats.default_dir,

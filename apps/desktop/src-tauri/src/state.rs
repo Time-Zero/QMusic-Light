@@ -12,11 +12,13 @@ use uuid::Uuid;
 use crate::cache::StreamCache;
 use crate::db;
 use crate::error::{PResult, PlatformError};
-use crate::lyric::DesktopLyric;
+use crate::lyric;
 use crate::models::{account_from_credentials, Account, Credentials};
 use crate::net::Net;
 use crate::prefs::PrefStore;
 use crate::secret::SecretStore;
+use crate::snapshot::Snapshot;
+use crate::taskbar;
 
 pub struct QrSession {
     pub id: String,
@@ -42,7 +44,9 @@ pub struct AppState {
     /// 整首音频缓存
     pub cache: StreamCache,
     /// 桌面歌词浮窗的最新快照（主窗口推增量，歌词窗口按需补读）
-    pub lyric: DesktopLyric,
+    pub lyric: Snapshot,
+    /// 任务栏面板的最新快照（同上，但只装封面与播放态）
+    pub taskbar: Snapshot,
     pub secret: SecretStore,
     pub credentials: RwLock<Option<Credentials>>,
     pub account: RwLock<Option<Account>>,
@@ -78,7 +82,8 @@ impl AppState {
             db: Mutex::new(connection),
             prefs,
             cache,
-            lyric: DesktopLyric::new(),
+            lyric: Snapshot::new(lyric::empty_snapshot()),
+            taskbar: Snapshot::new(taskbar::empty_snapshot()),
             secret,
             credentials: RwLock::new(credentials),
             account: RwLock::new(account),
