@@ -7,10 +7,15 @@
 //! 任务栏是系统的东西：厚度、停靠边、是否自动隐藏、系统明暗主题、有没有全屏应用
 //! 盖在上面，随时会被用户改。所以位置与尺寸不是「建好就算」，而是由一个低频巡检
 //! （`TICK`）持续对齐；任务栏藏起来或前台是全屏画面时，面板也跟着藏。
+//!
+//! 另外还有一条 20ms 的 z 序守卫（`GUARD_TICK`）：面板是压在任务栏上的独立置顶窗口，
+//! 而任务栏一旦被激活就会排到它前面，把面板整个盖住。这种遮挡必须在一两帧内抢回来，
+//! 挂在 1.2s 的巡检上就会变成用户眼里的「闪一下」。
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 use tauri::{
@@ -63,12 +68,81 @@ const HIDDEN_THICKNESS: i32 = 10;
 /// 任务栏找不到通知区域时的兜底留白（逻辑像素），大约让开托盘与时钟。
 const TRAY_FALLBACK: f64 = 180.0;
 
+/// 「想藏」要连续成立几拍才真的藏。全屏误判、任务栏自动隐藏的边界抖动
+/// 通常只持续一拍，为它闪一下不值当。
+const HIDE_DWELL: u32 = 2;
+/// 两次重新置顶之间的最小间隔。只用来挡住病态的自激（比如另一个置顶窗口
+/// 跟我们对着抢），不能设大：它就是「被任务栏盖住多久」的下限。
+const RAISE_COOLDOWN: Duration = Duration::from_millis(100);
+/// z 序守卫的心跳。
+///
+/// 任务栏被激活时会排到置顶层最前，把面板整个盖住：点托盘「显示隐藏图标」、
+/// 浮层关闭、点任务栏空白处都会触发。几何巡检的 1.2s 周期等不起 ——
+/// 用户看到的就是面板「消失一下再回来」。所以单独一条轻量心跳只做一件事：
+/// 被盖住了就立刻抢回来，代价是两次 Win32 调用。
+const GUARD_TICK: Duration = Duration::from_millis(20);
+/// 判定目标几何是否算「变了」的容差（物理像素）。托盘图标增减、
+/// DPI 取整都会带来一两像素的抖动，不值得为它重排窗口。
+const GEOMETRY_SLACK: i32 = 2;
+
 /// 面板此刻能不能露面：任务栏可见 + 没有全屏应用。由巡检写入。
 static SHOWABLE: AtomicBool = AtomicBool::new(true);
+/// 任务栏本身是否露在屏幕上。这是「硬信号」：自动隐藏或隐藏任务栏时
+/// 面板要立刻跟着收起，不必等迟滞。
+static TASKBAR_SHOWN: AtomicBool = AtomicBool::new(true);
 /// 面板页面是否已画完（前端主动报到）。没画完就 show 会先闪一帧白底或错的主题。
 static READY: AtomicBool = AtomicBool::new(false);
 /// 巡检任务只起一份：进程内只有一块任务栏。
 static WATCHING: AtomicBool = AtomicBool::new(false);
+/// z 序守卫同样只起一份。
+static GUARDING: AtomicBool = AtomicBool::new(false);
+/// 「想藏」已经连续成立了几拍，见 `refresh_visibility`。
+static UNWANTED: AtomicU32 = AtomicU32::new(0);
+/// 上一次真正写进窗口的目标几何。任务栏没动时，巡检一次 `SetWindowPos` 都不发。
+static WRITTEN: Mutex<Option<Target>> = Mutex::new(None);
+/// 上一次重新置顶的时刻，配合 `RAISE_COOLDOWN` 限流。
+static LAST_RAISE: Mutex<Option<Instant>> = Mutex::new(None);
+
+/// 面板窗口的目标几何（物理像素）。只用来回答「这一拍要不要动窗口」。
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct Target {
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+}
+
+impl Target {
+    /// 尺寸算不算「没变」。分开判尺寸与位置，是为了让「只是挪个位置」的巡检
+    /// 不会顺带发一次 resize —— 对透明窗口来说，那等于重建一次合成表面。
+    fn same_size(self, other: Self) -> bool {
+        self.width.abs_diff(other.width) <= GEOMETRY_SLACK as u32
+            && self.height.abs_diff(other.height) <= GEOMETRY_SLACK as u32
+    }
+
+    fn same_place(self, other: Self) -> bool {
+        (self.x - other.x).abs() <= GEOMETRY_SLACK
+            && (self.y - other.y).abs() <= GEOMETRY_SLACK
+    }
+}
+
+fn written_target() -> Option<Target> {
+    WRITTEN.lock().ok().and_then(|written| *written)
+}
+
+fn remember_target(target: Target) {
+    if let Ok(mut written) = WRITTEN.lock() {
+        *written = Some(target);
+    }
+}
+
+/// 窗口重建后必须忘掉上一次写过的几何：新窗口是摆回默认位置的，
+/// 就算目标值一模一样，也得再写一次才能贴回任务栏。
+fn forget_target() {
+    if let Ok(mut written) = WRITTEN.lock() {
+        *written = None;
+    }
+}
 
 pub fn empty_snapshot() -> Value {
     json!({ "song": Value::Null, "playing": false })
@@ -83,7 +157,7 @@ pub fn sync<R: Runtime>(app: &AppHandle<R>, state: &AppState, patch: &Value) -> 
     // 换歌时顺手校正一次：面板刚建好、巡检还没跑第一圈时，
     // 也不该在全屏画面或藏起来的任务栏上闪一下
     align(app);
-    refresh_visibility(app);
+    let _ = refresh_visibility(app);
     merged
 }
 
@@ -104,7 +178,7 @@ pub fn dispatch_action<R: Runtime>(app: &AppHandle<R>, action: &str) {
 /// 前端画完第一帧后报到：这时候才允许把窗口显出来。
 pub fn mark_ready<R: Runtime>(app: &AppHandle<R>) {
     READY.store(true, Ordering::SeqCst);
-    refresh_visibility(app);
+    let _ = refresh_visibility(app);
 }
 
 /// 开关面板。关掉直接销毁 webview：任务栏面板不需要「秒开」，
@@ -116,8 +190,11 @@ pub fn apply_enabled<R: Runtime>(app: &AppHandle<R>, enabled: bool) -> PResult<(
         }
         ensure_window(app)?;
         spawn_watcher(app.clone());
+        spawn_zorder_guard(app.clone());
     } else if let Some(window) = app.get_webview_window(TASKBAR_WINDOW) {
         READY.store(false, Ordering::SeqCst);
+        UNWANTED.store(0, Ordering::SeqCst);
+        forget_target();
         let _ = window.destroy();
     }
     Ok(())
@@ -146,19 +223,47 @@ fn has_song<R: Runtime>(app: &AppHandle<R>) -> bool {
         .unwrap_or(false)
 }
 
-fn refresh_visibility<R: Runtime>(app: &AppHandle<R>) {
+/// 对齐「该不该露面」与窗口现状。返回值只用于巡检日志。
+fn refresh_visibility<R: Runtime>(app: &AppHandle<R>) -> &'static str {
     let Some(window) = app.get_webview_window(TASKBAR_WINDOW) else {
-        return;
+        return "window-gone";
     };
     if !READY.load(Ordering::SeqCst) {
-        return;
+        return "page-loading";
     }
     let want = SHOWABLE.load(Ordering::SeqCst) && enabled(app) && has_song(app);
     let visible = window.is_visible().unwrap_or(false);
-    if want == visible {
-        return;
+
+    if want {
+        UNWANTED.store(0, Ordering::SeqCst);
+        if visible {
+            return "keep";
+        }
+        let _ = window.show();
+        return "show";
     }
-    let _ = if want { window.show() } else { window.hide() };
+
+    if !visible {
+        UNWANTED.store(0, Ordering::SeqCst);
+        return "keep-hidden";
+    }
+
+    // 任务栏本身收起来了（自动隐藏 / 隐藏任务栏）：硬信号，跟着它走，不等待迟滞
+    if !TASKBAR_SHOWN.load(Ordering::SeqCst) {
+        UNWANTED.store(0, Ordering::SeqCst);
+        let _ = window.hide();
+        return "hide(taskbar)";
+    }
+
+    // 其余都是「软」信号（前台全屏、暂时没有曲目）：等它在连续几拍里都成立再藏。
+    // 只抖一拍的判定不该让面板闪一下。
+    let misses = UNWANTED.fetch_add(1, Ordering::SeqCst) + 1;
+    if misses < HIDE_DWELL {
+        return "hold";
+    }
+    UNWANTED.store(0, Ordering::SeqCst);
+    let _ = window.hide();
+    "hide"
 }
 
 fn ensure_window<R: Runtime>(app: &AppHandle<R>) -> PResult<WebviewWindow<R>> {
@@ -170,6 +275,10 @@ fn ensure_window<R: Runtime>(app: &AppHandle<R>) -> PResult<WebviewWindow<R>> {
         .map(|metrics| metrics.size)
         .unwrap_or((130.0, 42.0));
     READY.store(false, Ordering::SeqCst);
+    // 新窗口是摆在默认位置的：上一轮记下的几何作废，否则「目标没变」会让我们
+    // 跳过第一次定位，窗口就停在屏幕中央不动了
+    forget_target();
+    UNWANTED.store(0, Ordering::SeqCst);
 
     let mut builder = WebviewWindowBuilder::new(
         app,
@@ -213,6 +322,30 @@ fn ensure_window<R: Runtime>(app: &AppHandle<R>) -> PResult<WebviewWindow<R>> {
     Ok(window)
 }
 
+/// z 序守卫：只负责「被任务栏盖住就立刻抢回来」。
+///
+/// 这条心跳刻意和几何巡检分开：巡检 1.2s 一次是为了省电（读注册表、枚举显示器），
+/// 而 z 序的恢复必须在一两帧内完成，否则用户看到的就是面板闪一下。
+fn spawn_zorder_guard<R: Runtime>(app: AppHandle<R>) {
+    if !cfg!(windows) || GUARDING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(GUARD_TICK).await;
+            // 先看窗口在不在（关掉开关时窗口会销毁），再谈偏好：
+            // 这条心跳 50Hz 在跑，能省一次偏好克隆就省
+            let Some(window) = app.get_webview_window(TASKBAR_WINDOW) else {
+                continue;
+            };
+            if !enabled(&app) {
+                continue;
+            }
+            ensure_on_top(&window);
+        }
+    });
+}
+
 fn spawn_watcher<R: Runtime>(app: AppHandle<R>) {
     if WATCHING.swap(true, Ordering::SeqCst) {
         return;
@@ -230,7 +363,7 @@ fn spawn_watcher<R: Runtime>(app: AppHandle<R>) {
                 last = None;
                 continue;
             };
-            keep_on_top(&window);
+            let (covered, raised) = ensure_on_top(&window);
             let Some(applied) = align(&app) else {
                 // 拿不到任务栏几何（例如 Explorer 正在重启）：保持原样，下个心跳再试
                 continue;
@@ -238,9 +371,12 @@ fn spawn_watcher<R: Runtime>(app: AppHandle<R>) {
             // 只有比例 / 朝向 / 主题真的变了才打扰前端
             if last.as_ref() != Some(&applied.layout) {
                 let _ = window.emit(LAYOUT_EVENT, &applied.layout);
-                last = Some(applied.layout);
+                last = Some(applied.layout.clone());
             }
-            refresh_visibility(&app);
+            let action = refresh_visibility(&app);
+            if trace_on() {
+                trace_tick(&applied, covered, raised, action, &foreground_hint(&app, &window));
+            }
         }
     });
 }
@@ -249,44 +385,49 @@ fn spawn_watcher<R: Runtime>(app: AppHandle<R>) {
 fn align<R: Runtime>(app: &AppHandle<R>) -> Option<Applied> {
     let window = app.get_webview_window(TASKBAR_WINDOW)?;
     let applied = apply(app)?;
-    SHOWABLE.store(
-        applied.visible && !fullscreen_ahead(app, &window),
-        Ordering::SeqCst,
-    );
+    let fullscreen = applied.visible && fullscreen_ahead(app, &window, applied.taskbar);
+    TASKBAR_SHOWN.store(applied.visible, Ordering::SeqCst);
+    SHOWABLE.store(applied.visible && !fullscreen, Ordering::SeqCst);
     Some(applied)
 }
 
 /// 一次对齐：尺寸与位置。返回本次测量结果（含要给前端的比例）。
+///
+/// 只有「目标几何」真的变了才碰窗口。巡检每秒都在跑，但任务栏不动时一次
+/// `SetWindowPos` 都不发 —— 否则透明窗口每拍都会被重新合成一遍，看着就是规律闪烁。
+/// 比较用 `GEOMETRY_SLACK` 的容差，而不是逐像素相等：否则实际位置只要因为
+/// DPI 取整差 1px，就会形成「写→系统对齐→下拍又不等→再写」的自激循环。
 fn apply<R: Runtime>(app: &AppHandle<R>) -> Option<Applied> {
     let window = app.get_webview_window(TASKBAR_WINDOW)?;
     let scale = window.scale_factor().unwrap_or(1.0);
     let metrics = measure(scale)?;
 
-    let want_size = PhysicalSize::new(
-        (metrics.size.0 * scale).round() as u32,
-        (metrics.size.1 * scale).round() as u32,
-    );
-    let resized = window
-        .inner_size()
-        .map(|current| {
-            current.width.abs_diff(want_size.width) > 1
-                || current.height.abs_diff(want_size.height) > 1
-        })
-        .unwrap_or(true);
-    if resized {
-        let _ = window.set_size(want_size);
-    }
+    let target = Target {
+        x: metrics.pos.0,
+        y: metrics.pos.1,
+        width: (metrics.size.0 * scale).round() as u32,
+        height: (metrics.size.1 * scale).round() as u32,
+    };
 
-    let want_pos = PhysicalPosition::new(metrics.pos.0, metrics.pos.1);
-    let moved = window
-        .outer_position()
-        .map(|current| current != want_pos)
-        .unwrap_or(true);
-    if moved {
-        let _ = window.set_position(want_pos);
+    let written = written_target();
+    let size_changed = written.map_or(true, |written| !written.same_size(target));
+    let pos_changed = written.map_or(true, |written| !written.same_place(target));
+
+    // 尺寸与位置分开写。给透明窗口发一次「尺寸其实没变」的 resize，
+    // WebView2 也会重建一次合成表面 —— 托盘图标增减只会挪位置，
+    // 这种时候多发一个 set_size，用户看到的就是一帧空白。
+    if size_changed {
+        let _ = window.set_size(PhysicalSize::new(target.width, target.height));
+    }
+    if size_changed || pos_changed {
+        let _ = window.set_position(PhysicalPosition::new(target.x, target.y));
+        remember_target(target);
     }
 
     Some(Applied {
+        wrote: size_changed || pos_changed,
+        taskbar: metrics.taskbar,
+        target,
         layout: layout_of(&metrics),
         visible: metrics.visible,
     })
@@ -302,6 +443,12 @@ fn layout_json<R: Runtime>(app: &AppHandle<R>) -> Value {
             pad: 5.0,
             size: (130.0, 42.0),
             pos: (0, 0),
+            taskbar: Rect {
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+            },
             vertical: false,
             visible: true,
         }),
@@ -341,6 +488,12 @@ struct Applied {
     layout: Value,
     /// 任务栏此刻是否露在外面
     visible: bool,
+    /// 任务栏矩形（物理像素）：用来判断面板属于哪块屏、以及和日志对照
+    taskbar: Rect,
+    /// 这一拍有没有真的动过窗口
+    wrote: bool,
+    /// 这一拍算出的目标几何
+    target: Target,
 }
 
 /// 一次任务栏测量的结果。
@@ -353,6 +506,8 @@ struct Measure {
     size: (f64, f64),
     /// 窗口位置（物理像素）
     pos: (i32, i32),
+    /// 任务栏矩形（物理像素），含停靠边信息
+    taskbar: Rect,
     /// 竖排任务栏（停靠左右两侧）：胶囊也跟着竖过来
     vertical: bool,
     /// 任务栏此刻是否可见
@@ -416,33 +571,61 @@ fn measure(scale: f64) -> Option<Measure> {
         pad,
         size,
         pos,
+        taskbar: dock.taskbar,
         vertical: dock.vertical,
         visible,
     })
 }
 
-/// 任务栏自己也是置顶窗口：用户点一下任务栏，它就被提到置顶层最前，把面板整个盖住。
-/// 只有在真的被压住时才重新置顶 —— 一次 `SetWindowPos` 换回可见性，
-/// 平时不动 z 序，也就不会去盖住音量 / 日历这些系统浮层。
+/// 任务栏自己也是置顶窗口：它一旦被激活（点托盘浮层、点任务栏空白处）就会排到
+/// 置顶层最前，把面板整个盖住。面板压在任务栏上这件事本身没错，错的是「被盖住
+/// 多久才抢回来」—— 实测被盖住的那段时间里，那块屏幕区域画的就是任务栏。
+///
+/// 所以这里只做一件事：被压住就立刻 `SetWindowPos` 抢回置顶。
+/// 由 20ms 的 `spawn_zorder_guard` 驱动，恢复时间从「一个巡检周期」压到一两帧；
+/// `RAISE_COOLDOWN` 只是防止另一个置顶窗口跟我们对着抢时的病态自激。
+///
+/// 返回 `(是否被压住, 是否真的重新置顶)`，只用于巡检日志。
 #[cfg(windows)]
-fn keep_on_top<R: Runtime>(window: &WebviewWindow<R>) {
-    if !window.is_visible().unwrap_or(false) {
-        return;
+fn ensure_on_top<R: Runtime>(window: &WebviewWindow<R>) -> (bool, bool) {
+    let Ok(hwnd) = window.hwnd() else {
+        return (false, false);
+    };
+    // 直接问 Win32：这条路径 50Hz 在跑，不能每次都同步回主线程问 Tauri
+    if !platform::is_visible(hwnd) {
+        return (false, false);
     }
-    if let Ok(hwnd) = window.hwnd() {
-        if platform::covered(hwnd) {
-            platform::raise(hwnd);
-        }
+    if !platform::covered_by_taskbar(hwnd) {
+        return (false, false);
     }
+    let now = Instant::now();
+    let Ok(mut last) = LAST_RAISE.lock() else {
+        return (true, false);
+    };
+    if last.map_or(false, |at| now.duration_since(at) < RAISE_COOLDOWN) {
+        return (true, false);
+    }
+    platform::raise(hwnd);
+    *last = Some(now);
+    (true, true)
 }
 
 #[cfg(not(windows))]
-fn keep_on_top<R: Runtime>(_window: &WebviewWindow<R>) {}
+fn ensure_on_top<R: Runtime>(_window: &WebviewWindow<R>) -> (bool, bool) {
+    (false, false)
+}
 
 /// 前台窗口盖住了整块屏（全屏视频 / 游戏）：面板必须让位，
 /// 否则一枚置顶胶囊会浮在别人的全屏画面里。
+///
+/// 只比**任务栏所在那块屏**。早先写成「任意一块屏被铺满就算全屏」，
+/// 副屏放全屏视频时主屏的面板也会被藏起来，看着就是无缘无故消失又回来。
 #[cfg(windows)]
-fn fullscreen_ahead<R: Runtime>(app: &AppHandle<R>, window: &WebviewWindow<R>) -> bool {
+fn fullscreen_ahead<R: Runtime>(
+    app: &AppHandle<R>,
+    window: &WebviewWindow<R>,
+    taskbar: Rect,
+) -> bool {
     let Ok(panel) = window.hwnd() else {
         return false;
     };
@@ -455,22 +638,92 @@ fn fullscreen_ahead<R: Runtime>(app: &AppHandle<R>, window: &WebviewWindow<R>) -
     let Ok(monitors) = app.available_monitors() else {
         return false;
     };
-    monitors.iter().any(|monitor| {
+    // 任务栏中心点落在哪块屏上，就只拿那块屏做比较
+    let center = (
+        taskbar.left + taskbar.width() / 2,
+        taskbar.top + taskbar.height() / 2,
+    );
+    let Some(monitor) = monitors.iter().find(|monitor| {
         let origin = monitor.position();
         let size = monitor.size();
-        let (left, top) = (origin.x, origin.y);
-        let (right, bottom) = (left + size.width as i32, top + size.height as i32);
-        // 铺满整块屏才算全屏：最大化窗口会矮一条任务栏，不会被误判
-        rect.left <= left + 2
-            && rect.top <= top + 2
-            && rect.right >= right - 2
-            && rect.bottom >= bottom - 2
-    })
+        center.0 >= origin.x
+            && center.0 < origin.x + size.width as i32
+            && center.1 >= origin.y
+            && center.1 < origin.y + size.height as i32
+    }) else {
+        return false;
+    };
+
+    let origin = monitor.position();
+    let size = monitor.size();
+    let (left, top) = (origin.x, origin.y);
+    let (right, bottom) = (left + size.width as i32, top + size.height as i32);
+    // 铺满整块屏才算全屏：最大化窗口会矮一条任务栏，不会被误判
+    rect.left <= left + 2
+        && rect.top <= top + 2
+        && rect.right >= right - 2
+        && rect.bottom >= bottom - 2
 }
 
 #[cfg(not(windows))]
-fn fullscreen_ahead<R: Runtime>(_app: &AppHandle<R>, _window: &WebviewWindow<R>) -> bool {
+fn fullscreen_ahead<R: Runtime>(
+    _app: &AppHandle<R>,
+    _window: &WebviewWindow<R>,
+    _taskbar: Rect,
+) -> bool {
     false
+}
+
+/// 巡检日志开关：设了 `QMUSIC_TASKBAR_LOG` 就每拍打一行，
+/// 用来把「看见的闪」和「代码里的动作」对到同一根时间轴上。
+fn trace_on() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("QMUSIC_TASKBAR_LOG").is_some())
+}
+
+fn trace_tick(
+    applied: &Applied,
+    covered: bool,
+    raised: bool,
+    action: &str,
+    foreground: &str,
+) {
+    static START: OnceLock<Instant> = OnceLock::new();
+    let elapsed = START.get_or_init(Instant::now).elapsed().as_secs_f64();
+
+    eprintln!(
+        "[taskbar +{elapsed:>8.1}s] taskbar=({},{},{}x{}) target=({},{} {}x{}) wrote={} covered={} raised={} showable={} fg={foreground} action={action}",
+        applied.taskbar.left,
+        applied.taskbar.top,
+        applied.taskbar.width(),
+        applied.taskbar.height(),
+        applied.target.x,
+        applied.target.y,
+        applied.target.width,
+        applied.target.height,
+        applied.wrote,
+        covered,
+        raised,
+        SHOWABLE.load(Ordering::SeqCst),
+    );
+}
+
+/// 前台窗口的类名。点开托盘溢出、开始菜单时，这一列会直接告诉我们是哪个
+/// shell 浮层顶到了前台 —— 排查「点一下系统图标面板就闪」时最有用。
+#[cfg(windows)]
+fn foreground_hint<R: Runtime>(app: &AppHandle<R>, window: &WebviewWindow<R>) -> String {
+    let main = app
+        .get_webview_window(crate::tray::MAIN_WINDOW)
+        .and_then(|window| window.hwnd().ok());
+    match window.hwnd() {
+        Ok(panel) => platform::foreground_class(panel, main).unwrap_or_else(|| "-".into()),
+        Err(_) => "-".into(),
+    }
+}
+
+#[cfg(not(windows))]
+fn foreground_hint<R: Runtime>(_app: &AppHandle<R>, _window: &WebviewWindow<R>) -> String {
+    "-".into()
 }
 
 #[derive(Clone, Copy)]
@@ -505,9 +758,10 @@ mod platform {
     use windows::Win32::Foundation::{HWND, RECT};
     use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_DWORD};
     use windows::Win32::UI::WindowsAndMessaging::{
-        FindWindowExW, FindWindowW, GetForegroundWindow, GetWindow, GetWindowLongPtrW, GetWindowRect,
-        IsWindowVisible, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, GW_HWNDPREV, HWND_TOPMOST,
-        SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+        FindWindowExW, FindWindowW, GetClassNameW, GetForegroundWindow, GetWindow, GetWindowLongPtrW,
+        GetWindowRect, IsWindowVisible, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, GW_HWNDPREV,
+        GW_OWNER, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, WS_EX_NOACTIVATE,
+        WS_EX_TOOLWINDOW,
     };
 
     use super::Rect;
@@ -548,12 +802,63 @@ mod platform {
     }
 
     /// 前台窗口矩形；前台就是自己的面板或主界面、或者取不到时返回 None。
+    ///
+    /// 只有「用户在看的内容窗口」才算数，见 `is_content_window`。
     pub fn foreground_rect(panel: HWND, main: Option<HWND>) -> Option<Rect> {
+        let foreground = not_ours(panel, main)?;
+        if !is_content_window(foreground) {
+            return None;
+        }
+        rect_of(foreground)
+    }
+
+    /// 前台窗口的类名，只给巡检日志用。
+    pub fn foreground_class(panel: HWND, main: Option<HWND>) -> Option<String> {
+        not_ours(panel, main).and_then(class_of)
+    }
+
+    fn not_ours(panel: HWND, main: Option<HWND>) -> Option<HWND> {
         let foreground = unsafe { GetForegroundWindow() };
         if foreground.0.is_null() || foreground == panel || Some(foreground) == main {
             return None;
         }
-        rect_of(foreground)
+        Some(foreground)
+    }
+
+    /// 是不是「用户真正在看的内容窗口」。
+    ///
+    /// 托盘的溢出浮层（`TopLevelWindowForOverflowXamlIsland` /
+    /// `NotifyIconOverflowWindow`）这类 shell 宿主窗口经常铺满整块屏，
+    /// 却只是几个隐藏图标的弹层。早先不加区分，点一下「显示隐藏图标」
+    /// 面板就误判成「有全屏应用」而藏起来 —— 正是那次「闪一下」的来源。
+    fn is_content_window(hwnd: HWND) -> bool {
+        // 工具窗口、被别人 owner 的窗口，都是附属界面
+        let style = unsafe { GetWindowLongPtrW(hwnd, GWL_EXSTYLE) } as u32;
+        if style & WS_EX_TOOLWINDOW.0 != 0 {
+            return false;
+        }
+        if unsafe { GetWindow(hwnd, GW_OWNER) }.map_or(false, |owner| !owner.0.is_null()) {
+            return false;
+        }
+        !matches!(
+            class_of(hwnd).as_deref(),
+            Some("Shell_TrayWnd")
+                | Some("Shell_SecondaryTrayWnd")
+                | Some("NotifyIconOverflowWindow")
+                | Some("TopLevelWindowForOverflowXamlIsland")
+                | Some("XamlExplorerHostIslandWindow")
+                | Some("Windows.UI.Core.CoreWindow")
+                | Some("ForegroundStaging")
+        )
+    }
+
+    fn class_of(hwnd: HWND) -> Option<String> {
+        let mut buffer = [0u16; 128];
+        let length = unsafe { GetClassNameW(hwnd, &mut buffer) };
+        if length <= 0 {
+            return None;
+        }
+        Some(String::from_utf16_lossy(&buffer[..length as usize]))
     }
 
     /// 把面板重新提到置顶层最前。
@@ -574,23 +879,28 @@ mod platform {
         }
     }
 
-    /// 我们上方是否压着别的可见窗口。沿 z 序往上走一小段就够：
-    /// 真会盖住任务栏的窗口（任务栏本身、系统浮层）就在附近。
-    pub fn covered(panel: HWND) -> bool {
-        let Some(ours) = rect_of(panel) else {
+    /// 窗口当前是否可见。走 Win32 而不是 Tauri 的封装：z 序守卫每秒要问几十次，
+    /// 不能让每次询问都变成一次「回到主线程」的同步调用。
+    pub fn is_visible(hwnd: HWND) -> bool {
+        unsafe { IsWindowVisible(hwnd) }.as_bool()
+    }
+
+    /// 任务栏自己是否压在我们上面。
+    ///
+    /// 只认任务栏：托盘溢出浮层、通知、输入法候选窗这些短命窗口就算盖住了
+    /// 也不值得重排一次 z 序 —— 而 `SetWindowPos` 会让透明窗口重新合成一遍，
+    /// 用户看到的就是这一下闪。它们本来就只存在一两秒，让开也无所谓。
+    pub fn covered_by_taskbar(panel: HWND) -> bool {
+        let Some(taskbar) = find(unsafe { FindWindowW(w!("Shell_TrayWnd"), PCWSTR::null()) }) else {
             return false;
         };
         let mut above = next_above(panel);
-        for _ in 0..16 {
+        for _ in 0..32 {
             let Some(hwnd) = above else {
                 break;
             };
-            if unsafe { IsWindowVisible(hwnd) }.as_bool() {
-                if let Some(other) = rect_of(hwnd) {
-                    if overlaps(ours, other) {
-                        return true;
-                    }
-                }
+            if hwnd == taskbar {
+                return true;
             }
             above = next_above(hwnd);
         }
@@ -601,10 +911,6 @@ mod platform {
         unsafe { GetWindow(hwnd, GW_HWNDPREV) }
             .ok()
             .filter(|next| !next.0.is_null())
-    }
-
-    fn overlaps(a: Rect, b: Rect) -> bool {
-        a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
     }
 
     /// 任务栏用的是系统色，不是应用色：跟随「Windows 模式」这一项。
@@ -696,5 +1002,43 @@ mod tests {
         assert_eq!(capsule(12, 1.0).0, MIN_H);
         // 任务栏被拉到很高
         assert_eq!(capsule(400, 1.0).0, MAX_H);
+    }
+
+    /// 巡检每次都比对目标几何：差一两像素必须判成「没变」，
+    /// 否则 DPI 取整会让窗口每拍都被重排一次，正是闪烁的来源。
+    #[test]
+    fn target_tolerates_jitter_but_not_real_moves() {
+        let base = Target {
+            x: 2687,
+            y: 1404,
+            width: 135,
+            height: 38,
+        };
+        let jitter = Target {
+            x: 2686,
+            y: 1405,
+            width: 134,
+            height: 38,
+        };
+        assert!(base.same_size(jitter));
+        assert!(base.same_place(jitter));
+        assert!(jitter.same_size(base));
+        assert!(jitter.same_place(base));
+
+        // 纯位移：只该判成「位置变了」，尺寸仍是原样，才不会被顺手 resize 一次
+        let shifted = Target {
+            x: 2700,
+            ..base
+        };
+        assert!(!base.same_place(shifted));
+        assert!(base.same_size(shifted));
+
+        // 纯换尺寸：位置不动
+        let resized = Target {
+            width: 200,
+            ..base
+        };
+        assert!(!base.same_size(resized));
+        assert!(base.same_place(resized));
     }
 }
