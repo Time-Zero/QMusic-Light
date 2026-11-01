@@ -173,7 +173,8 @@ function TrackRow({
       </div>
       <div className="t">
         <div className="mini">
-          <CoverImage src={song.cover} alt={song.name} />
+          {/* 34px 的缩略图，按 90 取图兼顾 2x 屏，别为一行字幅解码一张 300×300 */}
+          <CoverImage src={song.cover} alt={song.name} size={90} />
         </div>
         <div className="title">
           <span className="ellipsis">{song.name}</span>

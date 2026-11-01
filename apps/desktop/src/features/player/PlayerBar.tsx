@@ -73,7 +73,7 @@ export function PlayerBar() {
           onClick={() => song && setShowNowPlaying(true)}
           aria-label="打开播放页"
         >
-          {song ? <CoverImage src={song.cover} alt={song.name} /> : <span className="g">♫</span>}
+          {song ? <CoverImage src={song.cover} alt={song.name} size={90} /> : <span className="g">♫</span>}
         </button>
         <button
           type="button"

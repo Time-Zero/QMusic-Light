@@ -6,6 +6,7 @@
 
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::time::Duration;
 
 use serde_json::{json, Value};
 use tauri::{
@@ -31,6 +32,12 @@ const MIN_WIDTH: f64 = 420.0;
 const MIN_HEIGHT: f64 = 116.0;
 /// 首次出现时距屏幕底部的留白：避开任务栏，也不挡住主界面的播放条。
 const EDGE_GAP: i32 = 76;
+/// 关闭后多久真正释放歌词 webview。
+///
+/// 反复开关是常见操作，重建一次要等页面加载，所以刚关掉时只隐藏、随时能秒开；
+/// 但一个闲置 webview 常驻几十兆内存，一直留着不值。宽限期过后直接销毁，
+/// 下次打开再按需重建 —— 快照存在 Rust 侧，重建后照样立刻接上当前句。
+const IDLE_RELEASE: Duration = Duration::from_secs(300);
 
 /// 快照存储。键与前端 `LyricSnapshot` 一一对应，patch 里没出现的键保持原值。
 #[derive(Default)]
@@ -84,8 +91,8 @@ pub fn sync<R: Runtime>(app: &AppHandle<R>, state: &AppState, patch: &Value) -> 
     merged
 }
 
-/// 开 / 关桌面歌词。关闭只是隐藏窗口，webview 留着，
-/// 再打开时立刻能接上当前句，不重新加载页面。
+/// 开 / 关桌面歌词。关闭先只隐藏窗口（webview 留着，再打开立刻能接上当前句），
+/// 闲置超过宽限期才真正释放，见 `schedule_idle_release`。
 pub fn set_enabled<R: Runtime>(app: &AppHandle<R>, state: &AppState, enabled: bool) -> PResult<Value> {
     if enabled {
         let (window, created) = ensure_window(app)?;
@@ -103,6 +110,7 @@ pub fn set_enabled<R: Runtime>(app: &AppHandle<R>, state: &AppState, enabled: bo
         window
             .hide()
             .map_err(|error| PlatformError::msg(format!("无法隐藏桌面歌词：{error}")))?;
+        schedule_idle_release(app.clone());
     }
     let _ = app.emit(STATE_EVENT, json!({ "enabled": enabled }));
     Ok(json!({ "enabled": enabled }))
@@ -112,6 +120,24 @@ pub fn set_enabled<R: Runtime>(app: &AppHandle<R>, state: &AppState, enabled: bo
 /// 让主界面按钮跟着回到「关」，避免开关与窗口状态打架。
 pub fn notify_disabled<R: Runtime>(app: &AppHandle<R>) {
     let _ = app.emit(STATE_EVENT, json!({ "enabled": false }));
+}
+
+/// 宽限期结束后释放歌词 webview。
+///
+/// 每次隐藏都排一次；任务醒来只做一件事：窗口还在、且仍然不可见，就销毁。
+/// 期间被重新打开过则直接返回，交给下一次关闭重新排期，所以重复排期不会误杀。
+pub fn schedule_idle_release<R: Runtime>(app: AppHandle<R>) {
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(IDLE_RELEASE).await;
+        let Some(window) = app.get_webview_window(LYRIC_WINDOW) else {
+            return;
+        };
+        // 读不到可见性时按「还开着」处理，宁可多留一会儿也不误杀
+        if window.is_visible().unwrap_or(true) {
+            return;
+        }
+        let _ = window.destroy();
+    });
 }
 
 /// 浮窗上的播放控制：复用托盘那条动作通道，播放器只在主窗口里监听。

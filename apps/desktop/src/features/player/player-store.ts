@@ -2,7 +2,8 @@ import type { Core } from '@core';
 import { nextIndex, prevIndex } from '@core';
 import type { PlayMode, Quality, Song } from '@qmusic/shared-types';
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, type PersistStorage, type StorageValue } from 'zustand/middleware';
+import { coverAtSize } from '@/shared/lib/color';
 import { attachProgressDriver } from '@/shared/lib/progress-driver';
 import { toast } from '@/shared/ui/ui-store';
 import { localSrc, prefetchTrack, preparePlaybackSrc } from './stream-cache';
@@ -50,6 +51,87 @@ export interface PlayerState {
   removeAt: (index: number) => void;
   clearQueue: () => void;
 }
+
+/** partialize 之后真正落盘的字段。比对只看这几个，其余字段变化不该触发写盘。 */
+const PERSIST_FIELDS = ['queue', 'index', 'volume', 'muted', 'mode', 'contextLabel'] as const;
+/** 合并写窗口：拖音量、连点下一首时把连续变更收成一次。 */
+const PERSIST_DELAY_MS = 500;
+
+type PersistedPlayerState = Pick<PlayerState, (typeof PERSIST_FIELDS)[number]>;
+
+/**
+ * 播放状态的持久化通道。
+ *
+ * zustand 的 persist 在每次 setState 之后都会同步写一次 storage，而 currentTime
+ * 在播放时每秒都要 setState —— 哪怕 partialize 已经把它剔掉，中间件仍会对整个队列
+ * 做一次 JSON.stringify。队列上千首时，每秒凭空生成几百 KB 的临时字符串，
+ * 正好落在播放最吃紧的时刻，内存与 GC 压力都来自这里。
+ *
+ * 这里换成自己写的 storage：只比对真正落盘的字段，内容没变就直接返回（绝大多数
+ * currentTime 更新都会被挡掉）；真变了也合并到 500ms 一次，关窗前补写。
+ */
+function createThrottledStorage(): PersistStorage<PersistedPlayerState> {
+  let timer = 0;
+  let name = '';
+  let pending: StorageValue<PersistedPlayerState> | null = null;
+  /** 上一次写盘的字段快照：只做引用/值比对，不做序列化。 */
+  let last: unknown[] | null = null;
+
+  const flush = () => {
+    timer = 0;
+    const snapshot = pending;
+    pending = null;
+    if (!snapshot) return;
+    try {
+      localStorage.setItem(name, JSON.stringify(snapshot));
+    } catch {
+      // 配额写满或隐私模式下会抛，丢掉这次持久化不影响播放
+    }
+  };
+
+  const storage: PersistStorage<PersistedPlayerState> = {
+    getItem: (key) => {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? (JSON.parse(raw) as StorageValue<PersistedPlayerState>) : null;
+      } catch {
+        return null;
+      }
+    },
+    setItem: (key, value) => {
+      const fields: unknown[] = PERSIST_FIELDS.map((field) => value.state[field]);
+      const unchanged =
+        last !== null &&
+        fields.length === last.length &&
+        fields.every((field, index) => Object.is(field, last?.[index]));
+      if (unchanged) return;
+
+      last = fields;
+      name = key;
+      pending = value;
+      if (!timer) timer = window.setTimeout(flush, PERSIST_DELAY_MS);
+    },
+    removeItem: (key) => {
+      if (timer) window.clearTimeout(timer);
+      timer = 0;
+      pending = null;
+      last = null;
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        // 同上
+      }
+    },
+  };
+
+  // 关窗或刷新时把攒着的那次写掉，否则最后半秒的音量/歌单变动会丢
+  window.addEventListener('pagehide', flush);
+  window.addEventListener('beforeunload', flush);
+
+  return storage;
+}
+
+const playerStorage = createThrottledStorage();
 
 export const usePlayerStore = create<PlayerState>()(
   persist(
@@ -268,6 +350,7 @@ export const usePlayerStore = create<PlayerState>()(
     {
       name: 'qmusic:player',
       version: 2,
+      storage: playerStorage,
       // v1 的 order 语义是「列表循环」，v2 拆成 order（顺序）与 list（列表循环），
       // 老用户继续按列表循环播放，不改变听感
       migrate: (persisted, version) => {
@@ -292,7 +375,9 @@ export const usePlayerStore = create<PlayerState>()(
 function ensureAudio(): HTMLAudioElement {
   if (!audio) {
     audio = new Audio();
-    audio.preload = 'auto';
+    // 起播前只取元数据：换歌后真正开播会立刻拉流，不需要提前把缓冲灌满。
+    // 原来写 auto，等于每次换 src 都让 Chromium 尽可能多预读一段，白占内存。
+    audio.preload = 'metadata';
     audio.volume = usePlayerStore.getState().volume;
     audio.muted = usePlayerStore.getState().muted;
   }
@@ -378,7 +463,10 @@ function updateMediaSession(song: Song) {
       title: song.name,
       artist: song.singers.map((s) => s.name).join(' / '),
       album: song.albumName,
-      artwork: song.cover ? [{ src: song.cover, sizes: '300x300', type: 'image/jpeg' }] : [],
+      // 系统媒体浮窗只画几十像素，按 300×300 传图等于每次切歌多解一张 360 KB 的位图
+      artwork: song.cover
+        ? [{ src: coverAtSize(song.cover, 96), sizes: '96x96', type: 'image/jpeg' }]
+        : [],
     });
     navigator.mediaSession.setActionHandler('play', () => void usePlayerStore.getState().toggle());
     navigator.mediaSession.setActionHandler('pause', () => void usePlayerStore.getState().toggle());

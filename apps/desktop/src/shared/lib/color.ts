@@ -35,12 +35,29 @@ export const coverVars = (seed: string | number): CSSProperties => {
   return { '--cover-a': c1, '--cover-b': c2 } as CSSProperties;
 };
 
+/**
+ * QQ 音乐封面地址里带着尺寸模板：`.../T002R300x300M000<albumMid>.jpg`。
+ *
+ * 不改写的话，列表里 34px 的缩略图也会按 300×300 解码 —— 一张 360 KB 位图，
+ * 虚拟列表一屏二十行就白白吃掉七兆。按显示尺寸换掉模板，让 CDN 直接给小图。
+ * 其他图源（歌单封面的 qpic 域名等）没有这个模板，原样返回。
+ */
+export function coverAtSize(src: string, size?: number): string {
+  if (!src || !size) return src;
+  return src.replace(
+    /(\/T\d+R)\d+x\d+(M000)/,
+    (_match, head: string, tail: string) => `${head}${size}x${size}${tail}`,
+  );
+}
+
 /** 用封面平均色驱动播放页背景（文档 §7.4）。跨域受限时回退到哈希渐变。 */
 export function extractPalette(src: string, seed: string): Promise<{ c1: string; c2: string }> {
   const fallback = coverPalette(seed);
   if (!src) return Promise.resolve(fallback);
   return new Promise((resolve) => {
     const img = new Image();
+    // 只取 16×16 的平均色，没必要为了让 CDN 给原图而多占一张解码位图
+    const sample = coverAtSize(src, 96);
     // 不设置 crossOrigin：CDN 未返回 CORS 头时 canvas 会被标记为 tainted，
     // getImageData 抛错后回退到哈希渐变，避免控制台噪音。
     img.decoding = 'async';
@@ -79,6 +96,6 @@ export function extractPalette(src: string, seed: string): Promise<{ c1: string;
       window.clearTimeout(timer);
       resolve(fallback);
     };
-    img.src = src;
+    img.src = sample;
   });
 }

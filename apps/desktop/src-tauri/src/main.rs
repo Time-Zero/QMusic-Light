@@ -63,6 +63,8 @@ fn main() {
                     api.prevent_close();
                     let _ = window.hide();
                     lyric::notify_disabled(window.app_handle());
+                    // 走 Alt+F4 关掉的那条路也要排期，否则这个 webview 会一直挂到退出
+                    lyric::schedule_idle_release(window.app_handle().clone());
                 }
                 return;
             }

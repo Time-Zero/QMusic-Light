@@ -402,9 +402,17 @@ fn ensure_allowed_url(url: &str) -> PResult<()> {
     }
 }
 
+/// 单次读取的硬上限。协议层已经按 2 MiB 分块，这里再兜一层：
+/// 一个算错的 Range 会让 `vec![0u8; len]` 直接吃掉几 GB，
+/// 分配失败是 abort —— 整个进程连带播放一起没，不如返回错误体面收场。
+pub const MAX_READ_BYTES: u64 = 8 * 1024 * 1024;
+
 /// 读文件的一段，供协议处理器拼 200 / 206 响应。
 pub fn read_slice(path: &Path, start: u64, len: u64) -> PResult<Vec<u8>> {
     use std::io::{Seek, SeekFrom};
+    if len == 0 || len > MAX_READ_BYTES {
+        return Err(PlatformError::msg("读取区间超出上限"));
+    }
     let mut file = File::open(path)?;
     file.seek(SeekFrom::Start(start))?;
     let mut buffer = vec![0u8; len as usize];
