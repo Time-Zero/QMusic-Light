@@ -1,6 +1,8 @@
 import { QUALITY_LABEL } from '@qmusic/shared-types';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  ChevronLeft,
+  ChevronRight,
   Database,
   FolderOpen,
   HardDriveDownload,
@@ -17,7 +19,13 @@ import {
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCore, useSysInfo } from '@/app/core-context';
-import { CACHE_LIMIT_OPTIONS, QUALITY_OPTIONS, useSettingsStore } from '@/app/settings-store';
+import {
+  CACHE_LIMIT_OPTIONS,
+  QUALITY_OPTIONS,
+  TASKBAR_SHIFT_MAX,
+  TASKBAR_SHIFT_STEP,
+  useSettingsStore,
+} from '@/app/settings-store';
 import { bridge, IS_TAURI } from '@/bridge';
 import { useAccount, useSessionStore } from '@/features/auth/session-store';
 import { usePlayerStore } from '@/features/player/player-store';
@@ -50,6 +58,7 @@ export default function SettingsPage() {
   const closeAction = useSettingsStore((s) => s.closeAction);
   const minimizeToTray = useSettingsStore((s) => s.minimizeToTray);
   const taskbarPanel = useSettingsStore((s) => s.taskbarPanel);
+  const taskbarShift = useSettingsStore((s) => s.taskbarShift);
   const updatePrefs = useSettingsStore((s) => s.updatePrefs);
   const refreshCacheStats = useSettingsStore((s) => s.refreshCacheStats);
   const clearStreamCache = useSettingsStore((s) => s.clearStreamCache);
@@ -153,6 +162,17 @@ export default function SettingsPage() {
     } finally {
       setBusy(null);
     }
+  };
+
+  /**
+   * 任务栏面板沿任务栏微调。正数是离开托盘的那一头（水平任务栏向左、竖排向上），
+   * 负值只用来往回挪：平台侧会把面板贴在任务栏边缘，不会压到托盘图标上。
+   */
+  const nudgeTaskbar = (step: number) => {
+    // 从 store 现读现值：连点几下时渲染里的值可能还没跟上
+    const current = useSettingsStore.getState().taskbarShift;
+    const next = Math.min(Math.max(current + step, 0), TASKBAR_SHIFT_MAX);
+    if (next !== current) void updatePrefs({ taskbarShift: next });
   };
 
   const resetCacheDir = async () => {
@@ -528,12 +548,52 @@ export default function SettingsPage() {
             </div>
           </div>
           <div className="setting-row">
+            <span className="label">面板位置</span>
+            <div className="setting-actions">
+              <span className="value">
+                {taskbarShift === 0 ? '默认（紧贴通知区域）' : `偏移 ${taskbarShift}px`}
+              </span>
+              <button
+                type="button"
+                className="pill"
+                title="向左移动（竖排任务栏时为向上）"
+                aria-label="任务栏面板向左移动"
+                disabled={!taskbarPanel || taskbarShift >= TASKBAR_SHIFT_MAX}
+                onClick={() => nudgeTaskbar(TASKBAR_SHIFT_STEP)}
+              >
+                <ChevronLeft />
+              </button>
+              <button
+                type="button"
+                className="pill"
+                title="向右移动（竖排任务栏时为向下）"
+                aria-label="任务栏面板向右移动"
+                disabled={!taskbarPanel || taskbarShift <= 0}
+                onClick={() => nudgeTaskbar(-TASKBAR_SHIFT_STEP)}
+              >
+                <ChevronRight />
+              </button>
+              {taskbarShift > 0 ? (
+                <button
+                  type="button"
+                  className="pill"
+                  disabled={!taskbarPanel}
+                  onClick={() => void updatePrefs({ taskbarShift: 0 })}
+                >
+                  复位
+                </button>
+              ) : null}
+            </div>
+          </div>
+          <div className="setting-row">
             <span className="label">托盘菜单</span>
             <span className="value">显示主界面 / 播放暂停 / 上一首 / 下一首 / 退出</span>
           </div>
           <p className="muted" style={{ marginTop: 10, fontSize: 11, lineHeight: 1.7 }}>
             收进托盘后窗口隐藏但播放继续；需要彻底退出请用托盘菜单里的「退出」，或把点击关闭改成直接退出。
             任务栏面板只在 Windows 上出现，贴住通知区域左侧，有歌在播时才显示。
+            「面板位置」可以让它沿任务栏挪开，最多挪到任务栏另一头，不会盖住托盘图标；
+            任务栏竖排时，左右两个箭头对应向上 / 向下。
           </p>
         </section>
 

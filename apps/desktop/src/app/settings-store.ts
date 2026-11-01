@@ -21,6 +21,8 @@ interface SettingsState {
   minimizeToTray: boolean;
   /** 任务栏播放控制面板（Windows）。窗口归平台侧管，这里只做开关 */
   taskbarPanel: boolean;
+  /** 面板沿任务栏挪开的距离（逻辑像素）：0 是贴着通知区域的默认摆位 */
+  taskbarShift: number;
   streamCache: boolean;
   cacheDir: string;
   defaultCacheDir: string;
@@ -45,6 +47,7 @@ function shellFields(value: ShellSettings): Partial<SettingsState> {
     closeAction: value.closeAction,
     minimizeToTray: value.minimizeToTray,
     taskbarPanel: value.taskbarPanel,
+    taskbarShift: value.taskbarShift,
     streamCache: value.streamCache,
     cacheDir: value.cacheDir,
     defaultCacheDir: value.defaultCacheDir,
@@ -67,6 +70,7 @@ export const useSettingsStore = create<SettingsState>()(
       closeAction: 'tray',
       minimizeToTray: true,
       taskbarPanel: true,
+      taskbarShift: 0,
       streamCache: true,
       cacheDir: '',
       defaultCacheDir: '',
@@ -147,6 +151,13 @@ export const QUALITY_OPTIONS: { value: Quality; label: string; hint: string }[] 
   { value: '320', label: 'HQ 320k', hint: '推荐，体积与音质平衡' },
   { value: '128', label: '标准 128k', hint: '省流量' },
 ];
+
+/**
+ * 任务栏面板位置微调：每点一下挪 20 逻辑像素，上限与 Rust 侧
+ * `prefs.rs::MAX_TASKBAR_SHIFT` 对齐（那边才是真源，越界会被它夹回去）。
+ */
+export const TASKBAR_SHIFT_STEP = 20;
+export const TASKBAR_SHIFT_MAX = 800;
 
 /** 播放缓存上限档位；平台层会把值收敛到 128MB ~ 64GB */
 export const CACHE_LIMIT_OPTIONS: { value: number; label: string }[] = [

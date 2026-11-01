@@ -8,6 +8,9 @@
 //! 盖在上面，随时会被用户改。所以位置与尺寸不是「建好就算」，而是由一个低频巡检
 //! （`TICK`）持续对齐；任务栏藏起来或前台是全屏画面时，面板也跟着藏。
 //!
+//! 位置默认紧贴通知区域；设置里可以让它沿任务栏挪开（`MAX_TASKBAR_SHIFT`），
+//! 但只允许往远离托盘的一头走，两头都由 `shifted` 夹在任务栏范围内。
+//!
 //! 另外还有一条 20ms 的 z 序守卫（`GUARD_TICK`）：面板是压在任务栏上的独立置顶窗口，
 //! 而任务栏一旦被激活就会排到它前面，把面板整个盖住。这种遮挡必须在一两帧内抢回来，
 //! 挂在 1.2s 的巡检上就会变成用户眼里的「闪一下」。
@@ -24,6 +27,7 @@ use tauri::{
 };
 
 use crate::error::{PResult, PlatformError};
+use crate::prefs::MAX_TASKBAR_SHIFT;
 use crate::state::AppState;
 use crate::webview;
 
@@ -215,6 +219,21 @@ fn enabled<R: Runtime>(app: &AppHandle<R>) -> bool {
         .unwrap_or(false)
 }
 
+/// 用户给面板挪出来的位移（逻辑像素），0 就是贴着通知区域的默认摆位。
+fn shift_of<R: Runtime>(app: &AppHandle<R>) -> i32 {
+    app.try_state::<AppState>()
+        .map(|state| state.prefs.get().taskbar_shift)
+        .unwrap_or(0)
+}
+
+/// 偏好里的位移变了：立刻重排一次。
+///
+/// 巡检每 1.2s 才跑一拍，设置页点一下「←」要等一个周期才动，
+/// 用起来就像按钮没生效；所以这里手动催一次，让面板当场跟手。
+pub fn realign<R: Runtime>(app: &AppHandle<R>) {
+    align(app);
+}
+
 /// 有没有当前曲目。`song` 为 null（从没播过 / 清空了队列）时面板整体收起：
 /// 一个没有内容的胶囊留在任务栏上，只会白占位置、吞掉托盘附近的点击。
 fn has_song<R: Runtime>(app: &AppHandle<R>) -> bool {
@@ -271,7 +290,7 @@ fn ensure_window<R: Runtime>(app: &AppHandle<R>) -> PResult<WebviewWindow<R>> {
         return Ok(window);
     }
     // 尺寸取自任务栏实际厚度，页面还没起来也能一次摆对
-    let size = measure(scale_of(app))
+    let size = measure(scale_of(app), shift_of(app))
         .map(|metrics| metrics.size)
         .unwrap_or((130.0, 42.0));
     READY.store(false, Ordering::SeqCst);
@@ -400,7 +419,7 @@ fn align<R: Runtime>(app: &AppHandle<R>) -> Option<Applied> {
 fn apply<R: Runtime>(app: &AppHandle<R>) -> Option<Applied> {
     let window = app.get_webview_window(TASKBAR_WINDOW)?;
     let scale = window.scale_factor().unwrap_or(1.0);
-    let metrics = measure(scale)?;
+    let metrics = measure(scale, shift_of(app))?;
 
     let target = Target {
         x: metrics.pos.0,
@@ -434,7 +453,7 @@ fn apply<R: Runtime>(app: &AppHandle<R>) -> Option<Applied> {
 }
 
 fn layout_json<R: Runtime>(app: &AppHandle<R>) -> Value {
-    let metrics = measure(scale_of(app));
+    let metrics = measure(scale_of(app), shift_of(app));
     match metrics {
         Some(metrics) => layout_of(&metrics),
         // 拿不到任务栏（非 Windows / Explorer 未起来）：给一组能看的默认值
@@ -528,7 +547,19 @@ fn capsule(thickness: i32, scale: f64) -> (f64, f64) {
     (h, pad)
 }
 
-fn measure(scale: f64) -> Option<Measure> {
+/// 默认摆位 `default` 沿任务栏方向挪开 `shift` 之后的坐标。
+///
+/// 位移只往「离开通知区域」的一头走（水平任务栏向左、竖排任务栏向上），
+/// 并且两头都夹住：最多推到任务栏起始边 `start`，最少回到默认摆位。
+/// 也就是说这枚胶囊可以沿着任务栏滑，但不会盖住托盘图标、也不会跑出任务栏。
+fn shifted(default: i32, shift: i32, start: i32) -> i32 {
+    // 先夹住「不越过默认摆位」（挡住负偏移），再夹住「不越过任务栏起始边」。
+    // 顺序不能反：默认摆位本身落在起始边外时，任务栏边界才是硬约束。
+    (default - shift).min(default).max(start)
+}
+
+/// 量一次任务栏。`shift` 是用户在设置里给面板挪出来的位移（逻辑像素）。
+fn measure(scale: f64, shift: i32) -> Option<Measure> {
     let dock = platform::dock()?;
     let thickness = if dock.vertical {
         dock.taskbar.width()
@@ -550,18 +581,20 @@ fn measure(scale: f64) -> Option<Measure> {
     // 贴着通知区域放，中间留一点呼吸；通知区域找不到就按 180 逻辑像素兜底
     let gap = (8.0 * scale).round() as i32;
     let fallback = (TRAY_FALLBACK * scale).round() as i32;
+    // 用户挪出来的位移按逻辑像素存，这里折成物理像素
+    let shift = (shift.clamp(0, MAX_TASKBAR_SHIFT) as f64 * scale).round() as i32;
 
     let pos = if dock.vertical {
         // 竖排任务栏的通知区域在最下端，面板叠在它上方
         let anchor = dock.tray.map(|tray| tray.top).unwrap_or(dock.taskbar.bottom - fallback);
         (
             dock.taskbar.left + (thickness - width) / 2,
-            anchor - gap - height,
+            shifted(anchor - gap - height, shift, dock.taskbar.top),
         )
     } else {
         let anchor = dock.tray.map(|tray| tray.left).unwrap_or(dock.taskbar.right - fallback);
         (
-            anchor - gap - width,
+            shifted(anchor - gap - width, shift, dock.taskbar.left),
             dock.taskbar.top + (thickness - height) / 2,
         )
     };
@@ -994,6 +1027,20 @@ mod tests {
         assert_eq!(pad100, pad150);
         // 留白要留得出来，但别把胶囊挤成一条缝
         assert!(pad100 >= 3.0 && pad100 < h100 / 2.0);
+    }
+
+    /// 位移只往远离托盘的一头走，并且被任务栏起始边夹住：
+    /// 否则「再点一下」会把面板推到屏幕外或压到托盘图标上。
+    #[test]
+    fn shift_slides_along_taskbar_within_edges() {
+        // 默认贴托盘、任务栏左边界在 0：往左 40px 就是 40
+        assert_eq!(shifted(1500, 40, 0), 1460);
+        // 挪过头就停在任务栏起始边
+        assert_eq!(shifted(1500, 5000, 0), 0);
+        // 负数（往托盘里挤）没有意义，原地不动
+        assert_eq!(shifted(1500, -40, 0), 1500);
+        // 默认摆位本身就在边界外时，不要反弹到更远的地方
+        assert_eq!(shifted(-30, 0, 0), 0);
     }
 
     #[test]

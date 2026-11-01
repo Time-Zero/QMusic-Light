@@ -227,6 +227,8 @@ export interface ShellSettings {
   minimizeToTray: boolean;
   /** 任务栏播放控制面板（Windows）：窗口由平台侧托管 */
   taskbarPanel: boolean;
+  /** 面板沿任务栏的位移（逻辑像素）：0 = 紧贴通知区域，正数离开托盘（水平向左 / 竖排向上） */
+  taskbarShift: number;
   /** 播放时把整首音频缓存到本机 */
   streamCache: boolean;
   /** 当前生效的缓存目录 */

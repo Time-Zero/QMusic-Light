@@ -226,6 +226,12 @@ export type BridgeAccount = Account;
 export type ShellPrefsPatch = Partial<
   Pick<
     ShellSettings,
-    'closeAction' | 'minimizeToTray' | 'taskbarPanel' | 'streamCache' | 'cacheDir' | 'cacheMaxBytes'
+    | 'closeAction'
+    | 'minimizeToTray'
+    | 'taskbarPanel'
+    | 'taskbarShift'
+    | 'streamCache'
+    | 'cacheDir'
+    | 'cacheMaxBytes'
   >
 >;

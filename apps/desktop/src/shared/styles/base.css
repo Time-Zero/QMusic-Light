@@ -332,7 +332,7 @@ ol {
     transform var(--dur-press) var(--ease-out);
 }
 
-.pill:hover {
+.pill:not([disabled]):hover {
   color: var(--text);
   box-shadow:
     0 0 0 1px var(--shade-2),
@@ -340,8 +340,14 @@ ol {
     inset 0 1px 0 var(--hi);
 }
 
-.pill:active {
+.pill:not([disabled]):active {
   transform: scale(0.98);
+}
+
+/* 到顶的微调箭头：淡化并去掉悬停反馈，否则看着还能继续点 */
+.pill[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .pill svg {

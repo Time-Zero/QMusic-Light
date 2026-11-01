@@ -78,6 +78,11 @@ async fn dispatch(app: &AppHandle, state: &AppState, command: &str, args: &Value
                 .cache
                 .set_dir(next.cache_dir.as_ref().map(PathBuf::from))?;
             state.prefs.commit(next.clone());
+            // 位置偏好变了：落盘后立刻重排一次。巡检要 1.2s 才跑一拍，
+            // 等它到位的话，设置里点一下「←」看着就像没生效
+            if next.taskbar_shift != current.taskbar_shift {
+                taskbar::realign(app);
+            }
             state.cache.enforce_limit(next.cache_max_bytes);
             Ok(settings_json(state))
         }
@@ -176,6 +181,7 @@ fn settings_json(state: &AppState) -> Value {
         "closeAction": prefs.close_action,
         "minimizeToTray": prefs.minimize_to_tray,
         "taskbarPanel": prefs.taskbar_panel,
+        "taskbarShift": prefs.taskbar_shift,
         "streamCache": prefs.stream_cache,
         "cacheDir": stats.dir,
         "defaultCacheDir": stats.default_dir,

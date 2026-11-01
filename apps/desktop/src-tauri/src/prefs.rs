@@ -11,6 +11,11 @@ pub const MIN_CACHE_BYTES: u64 = 128 * 1024 * 1024;
 pub const MAX_CACHE_BYTES: u64 = 64 * 1024 * 1024 * 1024;
 pub const DEFAULT_CACHE_BYTES: u64 = 1024 * 1024 * 1024;
 
+/// 任务栏面板沿任务栏能挪多远（逻辑像素）。0 是默认摆位（紧贴通知区域），
+/// 正值把面板推向远离托盘的那一头；实际走得到多远还取决于任务栏有多长，
+/// 越界由 `taskbar::measure` 贴着任务栏边缘夹住。这里只收敛手改文件的离谱值。
+pub const MAX_TASKBAR_SHIFT: i32 = 800;
+
 /// 桌面歌词浮窗上一次的落点（物理像素）。换屏后由 lyric 模块重新夹取。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LyricPos {
@@ -39,6 +44,10 @@ pub struct Prefs {
     /// 任务栏播放控制面板：窗口由平台侧托管，开关必须启动时就读得到
     #[serde(default = "default_true")]
     pub taskbar_panel: bool,
+    /// 面板沿任务栏的位移（逻辑像素）：正值离开通知区域
+    /// （水平任务栏向左、竖排任务栏向上），0 表示默认摆位
+    #[serde(default)]
+    pub taskbar_shift: i32,
 }
 
 impl Default for Prefs {
@@ -51,6 +60,7 @@ impl Default for Prefs {
             cache_max_bytes: DEFAULT_CACHE_BYTES,
             lyric_pos: None,
             taskbar_panel: true,
+            taskbar_shift: 0,
         }
     }
 }
@@ -89,6 +99,8 @@ impl Prefs {
         self.lyric_pos = self.lyric_pos.filter(|pos| {
             (-100_000..100_000).contains(&pos.x) && (-100_000..100_000).contains(&pos.y)
         });
+        // 负值等于把面板推到托盘图标上，比「挪不动」更糟：按默认摆位处理
+        self.taskbar_shift = self.taskbar_shift.clamp(0, MAX_TASKBAR_SHIFT);
         self
     }
 }
@@ -171,6 +183,7 @@ mod tests {
                 x: 9_999_999,
                 y: 0,
             }),
+            taskbar_shift: -40,
             ..Default::default()
         }
         .normalized();
@@ -178,6 +191,18 @@ mod tests {
         assert_eq!(prefs.cache_max_bytes, MIN_CACHE_BYTES);
         assert!(prefs.cache_dir.is_none());
         assert!(prefs.lyric_pos.is_none());
+        // 负偏移会把面板压到托盘图标上，回到默认摆位
+        assert_eq!(prefs.taskbar_shift, 0);
+    }
+
+    #[test]
+    fn clamps_taskbar_shift_to_travel_limit() {
+        let prefs = Prefs {
+            taskbar_shift: MAX_TASKBAR_SHIFT * 3,
+            ..Default::default()
+        }
+        .normalized();
+        assert_eq!(prefs.taskbar_shift, MAX_TASKBAR_SHIFT);
     }
 
     #[test]
